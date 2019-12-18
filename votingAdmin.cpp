@@ -56,6 +56,37 @@
 
 namespace {
 
+#include <stdio.h>
+
+// #define BUFSIZE 128
+
+std::string execute(const std::string & command) {
+    // char *cmd = "ls -l";
+
+    std::string output;
+    const int BUFSIZE = 128;
+    char buf[BUFSIZE];
+    FILE *fp;
+
+    if ((fp = popen(command.c_str(), "r")) == NULL) {
+        return("Error opening pipe!\n");
+        // return "";
+    }
+
+    while(fgets(buf, BUFSIZE, fp) != NULL) {
+        // Do whatever you want here...
+        // printf("OUTPUT: %s", buf);
+        output+= buf;
+    }
+
+    if(pclose(fp)) {
+        return("Command not found or exited with error status\n");
+        // return "";
+    }
+
+    return output;
+}
+
 void showDialog(Wt::WObject *owner, Wt::WText *out)
 {
     auto dialog = owner->addChild(Wt::cpp14::make_unique<Wt::WDialog>("Go to cell"));
@@ -117,7 +148,7 @@ void showDialog(Wt::WObject *owner, Wt::WText *out)
 
 void passwCreator(Wt::WObject *owner)
 {
-    auto dialog = owner->addChild(Wt::cpp14::make_unique<Wt::WDialog>("Go to cell"));
+    auto dialog = owner->addChild(Wt::cpp14::make_unique<Wt::WDialog>("Create Password"));
 
     dialog->contents()->addNew<Wt::WLabel>("Password");
     auto pass0 = dialog->contents()->addNew<Wt::WLineEdit>();
@@ -175,6 +206,61 @@ void passwCreator(Wt::WObject *owner)
 }
 
 }
+
+#include <Wt/WTable.h>
+#include <Wt/WTableCell.h>
+
+// This renders correctly inside a row
+class ActionStatus : public Wt::WContainerWidget {
+
+    public:
+
+        ActionStatus() {
+
+            /*
+
+            // addStyleClass("container");
+
+            auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowA->addStyleClass("row");
+
+            auto cellA0 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA0->addStyleClass("col-md-6");
+
+            // auto label = cellA0->addWidget(std::make_unique<Wt::WLabel>("Minister Password"));
+            // label->setInline(false);
+
+            auto button = cellA0->addWidget(std::make_unique<Wt::WPushButton>("Create Password for Minister 1"));
+            button->setStyleClass("btn btn-lg btn-success");
+            // button->setInline(false);
+
+            auto cellA1 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA1->addStyleClass("col-md-6");
+            auto glyph = cellA1->addWidget(std::make_unique<Wt::WText>("<span class=\"glyphicon glyphicon-star\" aria-hidden=\"true\"></span> Star"));
+            // cellA1->addNew<Wt::WText>("<span class=\"glyphicon glyphicon-star\" aria-hidden=\"true\"></span> Star");
+            // auto glyph = cellA1->addWidget(std::make_unique<Wt::WText>("Hello!"));
+
+            */
+
+            auto table = addWidget(Wt::cpp14::make_unique<Wt::WTable>());
+            // table->setHeaderCount(1);
+            // table->setWidth(Wt::WLength("100%"));
+
+            auto button = table->elementAt(0, 0)->addNew<Wt::WPushButton>("Create Password for Minister 1");
+            button->setStyleClass("btn btn-lg btn-success");
+            table->elementAt(0, 0)->setContentAlignment(Wt::AlignmentFlag::Middle);
+            table->elementAt(0, 0)->setPadding(5);
+
+            table->elementAt(0, 1)->addNew<Wt::WText>("<span class=\"glyphicon glyphicon-remove\"></span>");
+            table->elementAt(0, 1)->setContentAlignment(Wt::AlignmentFlag::Middle);
+            table->elementAt(0, 1)->setPadding(5);
+        }
+
+
+    private:
+
+};
+
 
 /*
           <div class="panel panel-primary">
@@ -257,8 +343,43 @@ class StepInfo : public Wt::WContainerWidget {
         Wt::WText *msgText_;
 };
 
+/**
+ *
+ **/
+class TerminateVoting : public Wt::WContainerWidget {
+
+    public:
+
+        TerminateVoting() {
+
+            addWidget(std::make_unique<Wt::WText>("<h3>Terminate Voting</h3>"));
+
+        }
+
+    private:
+
+};
+
+/**
+ *
+ **/
+class ListOfPending : public Wt::WContainerWidget {
+
+    public:
+
+        ListOfPending() {
+
+            addWidget(std::make_unique<Wt::WText>("<h3>Pending People to Vote</h3>"));
+
+        }
+
+    private:
+
+};
+
 #include <Wt/WTable.h>
 #include <Wt/WTableCell.h>
+#include <Wt/WFont.h>
 
 /**
  *
@@ -267,16 +388,48 @@ class SendInvitations : public Wt::WContainerWidget {
 
     public:
 
-        SendInvitations() {
+        SendInvitations(const bool & firstTime) {
 
-            addWidget(std::make_unique<Wt::WText>("<h3>Send invitation to voters</h3>"));
+            std::string msg;
+            if(firstTime) {
+                msg = "<h3>Send invitation to voters</h3>";
+            } else {
+                msg = "<h3>Re-send invitation to pending voters</h3>";
+            }
 
+            addWidget(std::make_unique<Wt::WText>(msg));
+            // addWidget(std::make_unique<ActionStatus>());
+
+            auto button = addWidget(std::make_unique<Wt::WPushButton>("Send"));
+
+            button->clicked().connect([=] {
+                std::string output = execute("ls -l");
+                // output = "<strong>" + output + "</strong>";
+                commandOutput_->setText(output);
+            });
+
+            commandOutput_ = addWidget(std::make_unique<Wt::WTextArea>());
+            commandOutput_->setColumns(40);
+            commandOutput_->setRows(20);
+            commandOutput_->setReadOnly(true);
+
+            Wt::WFont mono;
+            mono.setFamily(Wt::FontFamily::Monospace, "'Courier New'");
+            mono.setSize(12);
+            commandOutput_->decorationStyle().setFont(mono);
+
+            Wt::WColor bgColor(10, 10, 10);
+            commandOutput_->decorationStyle().setBackgroundColor(bgColor);
+
+            Wt::WColor fgColor(245, 245, 245);
+            commandOutput_->decorationStyle().setForegroundColor(fgColor);
         }
 
     private:
 
-};
+        Wt::WTextArea *commandOutput_;
 
+};
 
 /**
  *
@@ -288,6 +441,8 @@ class VotingList : public Wt::WContainerWidget {
         VotingList() {
 
             addWidget(std::make_unique<Wt::WText>("<h3>Approve the list of of voters</h3>"));
+
+            addWidget(std::make_unique<ActionStatus>());
 
             auto table = addWidget(Wt::cpp14::make_unique<Wt::WTable>());
             table->setHeaderCount(1);
@@ -318,6 +473,10 @@ class MinisterPassw : public Wt::WContainerWidget {
             out->setStyleClass("help-block");
 
             auto button = addWidget(std::make_unique<Wt::WPushButton>("Create password"));
+
+            addWidget(std::make_unique<ActionStatus>());
+            addWidget(std::make_unique<ActionStatus>());
+            addWidget(std::make_unique<ActionStatus>());
 
             // auto c = this->get();
             button->clicked().connect([=] {
@@ -358,6 +517,9 @@ class AdminLayout : public Wt::WContainerWidget {
             cellF2->addStyleClass("col-md-4");
             cellF2->addWidget(std::make_unique<MinisterAuth>());
 
+            // rowF->setDisabled(true);
+            rowF->setHidden(true);
+
             /**
              * Row A
              **/
@@ -368,9 +530,14 @@ class AdminLayout : public Wt::WContainerWidget {
             cellA0->addStyleClass("col-md-8");
 
             stack = cellA0->addNew<Wt::WStackedWidget>();
-            stack->addNew<Wt::WText>("Just a single widget.");
+            // stack->addNew<Wt::WText>("Just a single widget.");
+            stack->addNew<Wt::WText>("<span class=\"glyphicon glyphicon-star\" aria-hidden=\"true\"></span> Star");
             stack->addNew<MinisterPassw>();
             stack->addNew<VotingList>();
+            stack->addNew<SendInvitations>(true);
+            stack->addNew<SendInvitations>(false);
+            stack->addNew<ListOfPending>();
+            stack->addNew<TerminateVoting>();
             stack->setCurrentIndex(0);
 
             auto cellA1 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -427,7 +594,7 @@ class AdminLayout : public Wt::WContainerWidget {
 
         void next() {
             int current = stack->currentIndex();
-            if (current < 2) {
+            if (current < 6) {
                 current++;
                 stack->setCurrentIndex(current);
             }
@@ -454,11 +621,13 @@ class AdminApp : public Wt::WApplication {
             setTheme(bootstrapTheme);
 
             useStyleSheet("resources/themes/bootstrap/3/bootstrap-theme.min.css");
-            useStyleSheet("https://getbootstrap.com/docs/3.4/dist/css/bootstrap.min.css");
+            // useStyleSheet("https://getbootstrap.com/docs/3.4/dist/css/bootstrap.min.css");
+            useStyleSheet("https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css");
+            useStyleSheet("https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap-theme.min.css");
             // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/starter-template/starter-template.css");
             // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/jumbotron/jumbotron.css");
             useStyleSheet("https://getbootstrap.com/docs/3.4/examples/grid/grid.css");
-            // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/theme/theme.css");
+            useStyleSheet("https://getbootstrap.com/docs/3.4/examples/theme/theme.css");
 
             root()->addNew<AdminLayout>();
         }
