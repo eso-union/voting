@@ -345,21 +345,101 @@ class VoterQuestion : public Wt::WContainerWidget {
         Wt::WTextArea *question_;
 };
 
+#include <Wt/WSelectionBox.h>
+
+/**
+ *
+ **/
+class VotingSelection : public Wt::WContainerWidget
+{
+    public:
+
+        VotingSelection()
+        {
+            addStyleClass("container");
+
+            addWidget(std::make_unique<Wt::WText>("<h3>Select or Create Voting</h3>"));
+
+            auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowA->addStyleClass("row");
+
+            auto cellA0 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA0->addStyleClass("col-md-4");
+            // cellB0->addWidget(std::make_unique<Wt::WText>("Begining:"));
+
+            // Wt::WSelectionBox *sb1 = addNew<Wt::WSelectionBox>();
+            Wt::WSelectionBox *sb1 = cellA0->addWidget(std::make_unique<Wt::WSelectionBox>());
+            sb1->addItem("Heavy");
+            sb1->addItem("Medium");
+            sb1->addItem("Light");
+            // sb1->setCurrentIndex(0); // Check if at least exist one element
+            sb1->setMargin(10, Wt::Side::Right);
+            Wt::WText *out = addNew<Wt::WText>("");
+
+            sb1->activated().connect(
+                [=]
+                {
+                    // out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
+                    selected_= sb1->currentText().toUTF8();
+                    out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
+                });
+
+            // auto continue = addWidget(std::make_unique<Wt::WPushButton>("Continue with selection"));
+            useSelected_= cellA0->addWidget(std::make_unique<Wt::WPushButton>("Continue with selection"));
+            useSelected_->addStyleClass("btn btn-warning");
+            useSelected_->clicked().connect(this, &VotingSelection::selected);
+
+            auto rowB = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowB->addStyleClass("row");
+
+            auto cellB0 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB0->addStyleClass("col-md-4");
+
+            newName_ = cellB0->addWidget(std::make_unique<Wt::WLineEdit>());
+
+            auto createVoting = cellB0->addWidget(std::make_unique<Wt::WPushButton>("Create Voting"));
+            createVoting->addStyleClass("btn btn-primary");
+            createVoting->clicked().connect(this, &VotingSelection::create);
+        }
+
+    private:
+
+        std::string selected_;
+        Wt::WLineEdit *newName_;
+        Wt::WPushButton *useSelected_;
+
+        // std::vector<Wt::WLineEdit*> input_;
+
+        void create()
+        {
+
+        }
+
+        void selected()
+        {
+
+        }
+};
+
+
 /**
  * The message box for each step.
  **/
-class StepInfo : public Wt::WContainerWidget {
-
+class StepInfo : public Wt::WContainerWidget
+{
     public:
 
         StepInfo(
             const bool &valid,
-            const std::string &text
-        ) {
+            const std::string &text)
+        {
             msgBox_ = addWidget(std::make_unique<Wt::WContainerWidget>());
-            if(valid) {
+            if(valid)
+            {
                 msgBox_->setStyleClass("alert alert-success");
-            } else {
+            }
+            else
+            {
                 msgBox_->setStyleClass("alert alert-warning");
             }
             msgText_ = msgBox_->addWidget(std::make_unique<Wt::WText>(text));
@@ -367,11 +447,14 @@ class StepInfo : public Wt::WContainerWidget {
 
         void setText(
             const bool &valid,
-            const std::string &text
-        ) {
-            if(valid) {
+            const std::string &text)
+        {
+            if(valid)
+            {
                 msgBox_->setStyleClass("alert alert-success");
-            } else {
+            }
+            else
+            {
                 msgBox_->setStyleClass("alert alert-warning");
             }
             msgText_->setText(text);
@@ -412,6 +495,7 @@ class GeneralLayout : public Wt::WContainerWidget
             cellA1->addStyleClass("col-md-8");
 
             stack = cellA1->addNew<Wt::WStackedWidget>();
+            stack->addNew<VotingSelection>();
             stack->addNew<VoterQuestion>();
             stack->addNew<VoteAlternatives>();
             stack->addNew<VotePosibilities>();
@@ -446,17 +530,21 @@ class GeneralLayout : public Wt::WContainerWidget
 
         Wt::WStackedWidget *stack;
 
-        void previous() {
+        void previous()
+        {
             int current = stack->currentIndex();
-            if (current > 0) {
+            if(current > 0)
+            {
                 current--;
                 stack->setCurrentIndex(current);
             }
         }
 
-        void next() {
+        void next()
+        {
             int current = stack->currentIndex();
-            if (current < 5) {
+            if(current < 6)
+            {
                 current++;
                 stack->setCurrentIndex(current);
             }
@@ -466,14 +554,16 @@ class GeneralLayout : public Wt::WContainerWidget
 /**
  * The web application.
  **/
-class BasicApp : public Wt::WApplication {
-
+class BasicApp : public Wt::WApplication
+{
     public:
 
-        BasicApp(const Wt::WEnvironment& env) : WApplication(env) {
+        BasicApp(const Wt::WEnvironment& env) : WApplication(env)
+        {
             setTitle("Voting System: configuration of the voting");
 
-            if(appRoot().empty()) {
+            if(appRoot().empty())
+            {
                 Wt::log("warning") << "the approot looks suspect, is empty!";
             }
 
@@ -503,6 +593,5 @@ int main(int argc, char **argv)
         [](const Wt::WEnvironment &env)
         {
             return std::make_unique<BasicApp>(env);
-        }
-    );
+        });
 }
