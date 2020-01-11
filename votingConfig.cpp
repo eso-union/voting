@@ -30,6 +30,7 @@
 
 // C++
 #include <vector>
+#include <memory>
 
 // Wt
 #include <Wt/WApplication.h>
@@ -49,14 +50,16 @@
 #include <Wt/WSpinBox.h>
 #include <Wt/WRadioButton.h>
 
+#include "postgresql.h"
+
 class VotingType : public Wt::WContainerWidget {
 
     public:
 
-        VotingType(const bool &testing, const bool &real):
-            testingEnabled_(testing),
-            realEnabled_(real) {
-
+        VotingType(
+            const Postgresql &db,
+            int &indexVoting): db_(db)
+        {
             addWidget(std::make_unique<Wt::WText>("<h3>Choose the type of voting</h3>"));
 
             testingButton_ = addNew<Wt::WRadioButton>("Testing Voting");
@@ -78,11 +81,13 @@ class VotingType : public Wt::WContainerWidget {
 
     private:
 
+        Postgresql db_;
+
         Wt::WRadioButton *testingButton_;
         Wt::WRadioButton *realButton_;
 
-        bool testingEnabled_;
-        bool testingConfigured_;
+        bool testingEnabled_= false;
+        bool testingConfigured_= false;
 
         bool realEnabled_;
         bool realConfigured_;
@@ -95,7 +100,8 @@ class NameEmail : public Wt::WContainerWidget {
 
     public:
 
-        NameEmail() {
+        NameEmail()
+        {
             auto row = addWidget(std::make_unique<Wt::WContainerWidget>());
             row->addStyleClass("row");
 
@@ -124,21 +130,41 @@ class NameEmail : public Wt::WContainerWidget {
             inputEmail_ = cell1->addWidget(std::make_unique<Wt::WLineEdit>(email));
         }
 
+        std::string getName()
+        {
+            std::string name;
+            if(inputName_ != nullptr) {
+                name= inputName_->text().toUTF8();
+            }
+            return name;
+        }
+
+        std::string getEmail()
+        {
+            std::string email;
+            if(inputEmail_ != nullptr) {
+                email= inputEmail_->text().toUTF8();
+            }
+            return email;
+        }
+
     private:
 
-        Wt::WLineEdit *inputName_;
-        Wt::WLineEdit *inputEmail_;
+        Wt::WLineEdit *inputName_= nullptr;
+        Wt::WLineEdit *inputEmail_= nullptr;
 };
 
 /**
  *
  **/
-class VotingPeople : public Wt::WContainerWidget {
-
+class VotingPeople : public Wt::WContainerWidget
+{
     public:
 
-        VotingPeople() {
-
+        VotingPeople(
+            const Postgresql &db,
+            int &indexVoting): db_(db)
+        {
             addWidget(std::make_unique<Wt::WText>("<h3>Enter the list of <em>email,name</em> of voters</h3>"));
             addWidget(std::make_unique<Wt::WText>("<h4>You may delay this step util you have done all the testing.</h4>"));
 
@@ -150,18 +176,21 @@ class VotingPeople : public Wt::WContainerWidget {
 
     private:
 
+        Postgresql db_;
         Wt::WTextArea *emailVoters_;
 };
 
 /**
  *
  **/
-class VotingTesters : public Wt::WContainerWidget {
-
+class VotingTesters : public Wt::WContainerWidget
+{
     public:
 
-        VotingTesters() {
-
+        VotingTesters(
+            const Postgresql &db,
+            int &indexVoting): db_(db)
+        {
             addWidget(std::make_unique<Wt::WText>("<h3>[optional] Name and email for testing</h3>"));
 
             auto row = addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -175,25 +204,47 @@ class VotingTesters : public Wt::WContainerWidget {
             cell1->addStyleClass("col-xs-6");
             cell1->addWidget(std::make_unique<Wt::WText>("Email address"));
 
-            addWidget(std::make_unique<NameEmail>());
-            addWidget(std::make_unique<NameEmail>());
-            addWidget(std::make_unique<NameEmail>());
-            addWidget(std::make_unique<NameEmail>());
-            addWidget(std::make_unique<NameEmail>());
+            for(int i=0; i<5; i++)
+            {
+                auto w= addWidget(std::make_unique<NameEmail>());
+                testersList.push_back(w);
+            }
+        }
+
+        int size() const
+        {
+            return testersList.size();
+        }
+
+        std::string name(const int &index) const
+        {
+            const std::string name= testersList.at(index)->getName();
+            return name;
+        }
+
+        std::string email(const int &index) const
+        {
+            const std::string email= testersList.at(index)->getEmail();
+            return email;
         }
 
     private:
 
+        Postgresql db_;
+        std::vector<NameEmail*> testersList;
 };
 
 /**
  *
  **/
-class VotePosibilities : public Wt::WContainerWidget {
-
+class VotePosibilities : public Wt::WContainerWidget
+{
     public:
 
-        VotePosibilities() {
+        VotePosibilities(
+            const Postgresql &db,
+            int &indexVoting): db_(db)
+        {
             addStyleClass("container");
 
             addWidget(std::make_unique<Wt::WText>("<h3>Voting possibilities</h3>"));
@@ -215,16 +266,20 @@ class VotePosibilities : public Wt::WContainerWidget {
 
     private:
 
+        Postgresql db_;
 };
 
 /**
  *
  **/
-class VoteAlternatives : public Wt::WContainerWidget {
-
+class VoteAlternatives : public Wt::WContainerWidget
+{
     public:
 
-        VoteAlternatives() {
+        VoteAlternatives(
+            const Postgresql &db,
+            int &indexVoting): db_(db)
+        {
             addStyleClass("container");
 
             addWidget(std::make_unique<Wt::WText>("<h3>Voting alternatives</h3>"));
@@ -240,6 +295,7 @@ class VoteAlternatives : public Wt::WContainerWidget {
 
     private:
 
+        Postgresql db_;
         std::vector<Wt::WLineEdit*> input_;
 
         void add() {
@@ -265,8 +321,10 @@ class VoterQuestion : public Wt::WContainerWidget {
 
     public:
 
-        VoterQuestion() {
-
+        VoterQuestion(
+            const Postgresql &db,
+            const int &indexVoting): db_(db)
+        {
             addWidget(std::make_unique<Wt::WText>("<h3>General settings</h3>"));
 
             addWidget(std::make_unique<Wt::WText>("Convocatory to voters:"));
@@ -341,11 +399,13 @@ class VoterQuestion : public Wt::WContainerWidget {
 
     private:
 
-        Wt::WTextArea *convocatory_;
-        Wt::WTextArea *question_;
+        Postgresql db_;
+        Wt::WTextArea *convocatory_= nullptr;
+        Wt::WTextArea *question_= nullptr;
 };
 
 #include <Wt/WSelectionBox.h>
+#include <Wt/WStringListModel.h>
 
 /**
  *
@@ -354,7 +414,9 @@ class VotingSelection : public Wt::WContainerWidget
 {
     public:
 
-        VotingSelection()
+        VotingSelection(
+            const Postgresql &db,
+            int &indexVoting): db_(db)
         {
             addStyleClass("container");
 
@@ -367,13 +429,36 @@ class VotingSelection : public Wt::WContainerWidget
             cellA0->addStyleClass("col-md-4");
             // cellB0->addWidget(std::make_unique<Wt::WText>("Begining:"));
 
+            std::string sentence= "SELECT idx, name FROM general;";
+            pqxx::result answer;
+            db_.execSql(sentence, answer);
+            auto model= std::make_shared<Wt::WStringListModel>();
+            pqxx::result::const_iterator row= answer.begin();
+            int i= 0;
+            if(row != answer.end())
+            {
+                std::cout
+                    << "************ row: "
+                    << row[0].as(std::string()) << ", "
+                    << row[1].as(std::string()) << "\n";
+
+                model->addString(row[1].as(std::string()));
+                model->setData(i, 0, row[0].as(std::string()), Wt::ItemDataRole::User);
+                row++;
+                i++;
+            }
+
             // Wt::WSelectionBox *sb1 = addNew<Wt::WSelectionBox>();
             Wt::WSelectionBox *sb1 = cellA0->addWidget(std::make_unique<Wt::WSelectionBox>());
-            sb1->addItem("Heavy");
-            sb1->addItem("Medium");
-            sb1->addItem("Light");
+            // sb1->addItem("Heavy");
+            // sb1->addItem("Medium");
+            // sb1->addItem("Light");
             // sb1->setCurrentIndex(0); // Check if at least exist one element
+
+            sb1->setNoSelectionEnabled(true);
+            sb1->setModel(model);
             sb1->setMargin(10, Wt::Side::Right);
+
             Wt::WText *out = addNew<Wt::WText>("");
 
             sb1->activated().connect(
@@ -381,7 +466,12 @@ class VotingSelection : public Wt::WContainerWidget
                 {
                     // out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
                     selected_= sb1->currentText().toUTF8();
-                    out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
+
+                    int index = sb1->currentIndex();
+                    Wt::WString info = Wt::asString(model->data(model->index(index,0), Wt::ItemDataRole::User));
+
+                    // out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
+                    out->setText(Wt::WString("You selected {1} with index {2}.").arg(selected_).arg(index));
                 });
 
             // auto continue = addWidget(std::make_unique<Wt::WPushButton>("Continue with selection"));
@@ -404,9 +494,10 @@ class VotingSelection : public Wt::WContainerWidget
 
     private:
 
+        Postgresql db_;
         std::string selected_;
-        Wt::WLineEdit *newName_;
-        Wt::WPushButton *useSelected_;
+        Wt::WLineEdit *newName_= nullptr;
+        Wt::WPushButton *useSelected_= nullptr;
 
         // std::vector<Wt::WLineEdit*> input_;
 
@@ -473,7 +564,8 @@ class GeneralLayout : public Wt::WContainerWidget
 {
     public:
 
-        GeneralLayout() {
+        GeneralLayout(const Postgresql &db): db_(db)
+        {
             addStyleClass("container");
 
             /**
@@ -495,13 +587,13 @@ class GeneralLayout : public Wt::WContainerWidget
             cellA1->addStyleClass("col-md-8");
 
             stack = cellA1->addNew<Wt::WStackedWidget>();
-            stack->addNew<VotingSelection>();
-            stack->addNew<VoterQuestion>();
-            stack->addNew<VoteAlternatives>();
-            stack->addNew<VotePosibilities>();
-            stack->addNew<VotingTesters>();
-            stack->addNew<VotingPeople>();
-            stack->addNew<VotingType>(true, false);
+            stack->addNew<VotingSelection>(db_, indexVoting_);
+            stack->addNew<VoterQuestion>(db_, indexVoting_);
+            stack->addNew<VoteAlternatives>(db_, indexVoting_);
+            stack->addNew<VotePosibilities>(db_, indexVoting_);
+            stack->addNew<VotingTesters>(db_, indexVoting_);
+            stack->addNew<VotingPeople>(db_, indexVoting_);
+            stack->addNew<VotingType>(db_, indexVoting_);
             stack->setCurrentIndex(0);
 
             /**
@@ -510,9 +602,54 @@ class GeneralLayout : public Wt::WContainerWidget
             auto rowB = addWidget(std::make_unique<Wt::WContainerWidget>());
             rowB->addStyleClass("row");
 
+            // cellB1 will stay empty.
             auto cellB1 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB1->addStyleClass("col-md-4");
 
+            // cellB2 will have a row with two cells.
+            auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB2->addStyleClass("col-md-4");
+
+            auto rowB2 = cellB2->addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowB2->addStyleClass("row");
+
+            auto cellB21 = rowB2->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB21->addStyleClass("col-xs-6");
+
+            auto bPrev = cellB21->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
+            bPrev->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
+            bPrev->clicked().connect(this, &GeneralLayout::previous);
+
+            auto cellB22 = rowB2->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB22->addStyleClass("col-xs-6");
+
+            auto bSave = cellB22->addWidget(std::make_unique<Wt::WPushButton>("Save"));
+            bSave->addStyleClass("btn btn-primary btn-lg btn-block btn-success");
+            // save->clicked().connect(this, &GeneralLayout::save);
+
+            // cellB3 will have a row with two cells.
+            auto cellB3 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB3->addStyleClass("col-md-4");
+
+            auto rowB3 = cellB3->addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowB3->addStyleClass("row");
+
+            auto cellB31 = rowB3->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB31->addStyleClass("col-xs-6");
+
+            auto bCancel = cellB31->addWidget(std::make_unique<Wt::WPushButton>("Cancel"));
+            //bCancel->addStyleClass("btn btn-primary btn-lg btn-warning");
+            bCancel->addStyleClass("btn btn-primary btn-lg btn-block btn-warning");
+            // cancel->clicked().connect(this, &GeneralLayout::cancel);
+
+            auto cellB32 = rowB3->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB32->addStyleClass("col-xs-6");
+
+            auto bNext = cellB32->addWidget(std::make_unique<Wt::WPushButton>("Next"));
+            bNext->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
+            bNext->clicked().connect(this, &GeneralLayout::next);
+
+            /*
             auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB2->addStyleClass("col-md-4");
             auto buttonPrev = cellB2->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
@@ -524,15 +661,18 @@ class GeneralLayout : public Wt::WContainerWidget
             auto buttonNext = cellB3->addWidget(std::make_unique<Wt::WPushButton>("Next"));
             buttonNext->addStyleClass("btn btn-primary btn-lg btn-block");
             buttonNext->clicked().connect(this, &GeneralLayout::next);
+            */
         }
 
     private:
 
+        int indexVoting_ = -1;
+        Postgresql db_;
         Wt::WStackedWidget *stack;
 
         void previous()
         {
-            int current = stack->currentIndex();
+            int current= stack->currentIndex();
             if(current > 0)
             {
                 current--;
@@ -542,7 +682,7 @@ class GeneralLayout : public Wt::WContainerWidget
 
         void next()
         {
-            int current = stack->currentIndex();
+            int current= stack->currentIndex();
             if(current < 6)
             {
                 current++;
@@ -558,7 +698,13 @@ class BasicApp : public Wt::WApplication
 {
     public:
 
-        BasicApp(const Wt::WEnvironment& env) : WApplication(env)
+        // BasicApp(
+        //    const Wt::WEnvironment& env,
+        //    std::shared_ptr<Postgresql> database): WApplication(env), db(database)
+
+        BasicApp(
+            const Wt::WEnvironment& env,
+            const Postgresql &db): WApplication(env), db_(db)
         {
             setTitle("Voting System: configuration of the voting");
 
@@ -578,8 +724,35 @@ class BasicApp : public Wt::WApplication
             useStyleSheet("https://getbootstrap.com/docs/3.4/examples/jumbotron/jumbotron.css");
             useStyleSheet("https://getbootstrap.com/docs/3.4/examples/grid/grid.css");
 
-            root()->addNew<GeneralLayout>();
+            root()->addNew<GeneralLayout>(db_);
         }
+
+    private:
+
+        Postgresql db_;
+
+};
+
+/// Wt
+#include <Wt/WApplication.h>
+
+/// Boost
+#include <boost/bind.hpp>
+
+class AppGenerator
+{
+    public:
+        AppGenerator(const Postgresql &db): db_(db)
+        {}
+
+        std::unique_ptr<BasicApp> createApp(const Wt::WEnvironment& env)
+        {
+            return std::make_unique<BasicApp>(env, db_);
+        }
+
+    private:
+
+        Postgresql db_;
 };
 
 /**
@@ -587,11 +760,26 @@ class BasicApp : public Wt::WApplication
  **/
 int main(int argc, char **argv)
 {
+    Postgresql db("voting00");
+
+    /*
+    pqxx::result answer;
+    std::string sentence= "SELECT * FROM general;";
+    db.execSql(sentence, answer);
+    const pqxx::result::const_iterator row= answer.begin();
+    if(row != answer.end())
+    {
+        std::cout
+            << "row: "
+            << row[0].as(std::string()) << ", "
+            << row[1].as(std::string()) << "\n";
+    }
+    */
+
+    AppGenerator ag(db);
+
     return Wt::WRun(
         argc,
         argv,
-        [](const Wt::WEnvironment &env)
-        {
-            return std::make_unique<BasicApp>(env);
-        });
+        boost::bind(&AppGenerator::createApp, &ag, _1));
 }
