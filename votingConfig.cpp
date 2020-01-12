@@ -50,10 +50,28 @@
 #include <Wt/WSpinBox.h>
 #include <Wt/WRadioButton.h>
 
+// Boost
+#include <boost/signals2.hpp>
+
+// Voting
 #include "postgresql.h"
 
-class VotingType : public Wt::WContainerWidget {
+const int READY   = 0;
+const int CHANGED = 1;
 
+class WidgetPanel: public Wt::WContainerWidget
+{
+    public:
+
+        virtual void save()
+        {
+            std::cout << "[parent] saving ...\n";
+        };
+
+        boost::signals2::signal<void (int)> notify;
+};
+
+class VotingType : public WidgetPanel {
     public:
 
         VotingType(
@@ -79,6 +97,12 @@ class VotingType : public Wt::WContainerWidget {
             }
         }
 
+        virtual void save()
+        {
+            std::cout << "[VotingType] saving ...\n";
+            notify(READY);
+        };
+
     private:
 
         Postgresql db_;
@@ -96,23 +120,9 @@ class VotingType : public Wt::WContainerWidget {
 /**
  *
  **/
-class NameEmail : public Wt::WContainerWidget {
-
+class NameEmail : public Wt::WContainerWidget
+{
     public:
-
-        NameEmail()
-        {
-            auto row = addWidget(std::make_unique<Wt::WContainerWidget>());
-            row->addStyleClass("row");
-
-            auto cell0 = row->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cell0->addStyleClass("col-xs-6");
-            inputName_ = cell0->addWidget(std::make_unique<Wt::WLineEdit>());
-
-            auto cell1 = row->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cell1->addStyleClass("col-xs-6");
-            inputEmail_ = cell1->addWidget(std::make_unique<Wt::WLineEdit>());
-        }
 
         NameEmail(
             const std::string &name,
@@ -123,17 +133,30 @@ class NameEmail : public Wt::WContainerWidget {
 
             auto cell0 = row->addWidget(std::make_unique<Wt::WContainerWidget>());
             cell0->addStyleClass("col-xs-6");
-            inputName_ = cell0->addWidget(std::make_unique<Wt::WLineEdit>(name));
+            inputName_= cell0->addWidget(std::make_unique<Wt::WLineEdit>(name));
+            inputName_->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    notify(CHANGED);
+                });
 
             auto cell1 = row->addWidget(std::make_unique<Wt::WContainerWidget>());
             cell1->addStyleClass("col-xs-6");
-            inputEmail_ = cell1->addWidget(std::make_unique<Wt::WLineEdit>(email));
+            inputEmail_= cell1->addWidget(std::make_unique<Wt::WLineEdit>(email));
+            inputEmail_->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    notify(CHANGED);
+                });
         }
+
+        NameEmail(): NameEmail{"", ""}{};
 
         std::string getName()
         {
             std::string name;
-            if(inputName_ != nullptr) {
+            if(inputName_ != nullptr)
+            {
                 name= inputName_->text().toUTF8();
             }
             return name;
@@ -142,11 +165,14 @@ class NameEmail : public Wt::WContainerWidget {
         std::string getEmail()
         {
             std::string email;
-            if(inputEmail_ != nullptr) {
+            if(inputEmail_ != nullptr)
+            {
                 email= inputEmail_->text().toUTF8();
             }
             return email;
         }
+
+        boost::signals2::signal<void(int)> notify;
 
     private:
 
@@ -157,7 +183,7 @@ class NameEmail : public Wt::WContainerWidget {
 /**
  *
  **/
-class VotingPeople : public Wt::WContainerWidget
+class VotingPeople : public WidgetPanel
 {
     public:
 
@@ -165,14 +191,31 @@ class VotingPeople : public Wt::WContainerWidget
             const Postgresql &db,
             int &indexVoting): db_(db)
         {
-            addWidget(std::make_unique<Wt::WText>("<h3>Enter the list of <em>email,name</em> of voters</h3>"));
-            addWidget(std::make_unique<Wt::WText>("<h4>You may delay this step util you have done all the testing.</h4>"));
+            addWidget(std::make_unique<Wt::WText>(
+                "<h3>Enter the list of <em>email,name</em> of voters</h3>"));
 
-            emailVoters_ = addWidget(std::make_unique<Wt::WTextArea>());
+            addWidget(std::make_unique<Wt::WText>(
+                "<h4>You may delay this step util you have done all the testing.</h4>"));
+
+            emailVoters_= addWidget(std::make_unique<Wt::WTextArea>());
             emailVoters_->setColumns(40);
             emailVoters_->setRows(10);
-            emailVoters_->setPlaceholderText("some@email.com,Some Name\nanother@email.com,Another Name");
+            emailVoters_->setPlaceholderText(
+                "some@email.com,Some Name\n"
+                "another@email.com,Another Name");
+
+            emailVoters_->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    notify(CHANGED);
+                });
         }
+
+        virtual void save()
+        {
+            std::cout << "[VotingPeople] saving ...\n";
+            notify(READY);
+        };
 
     private:
 
@@ -183,7 +226,7 @@ class VotingPeople : public Wt::WContainerWidget
 /**
  *
  **/
-class VotingTesters : public Wt::WContainerWidget
+class VotingTesters : public WidgetPanel
 {
     public:
 
@@ -206,7 +249,9 @@ class VotingTesters : public Wt::WContainerWidget
 
             for(int i=0; i<5; i++)
             {
-                auto w= addWidget(std::make_unique<NameEmail>());
+                auto ne = std::make_unique<NameEmail>();
+                ne->notify.connect(boost::bind(&VotingTesters::dataChanged, this, _1));
+                auto w= addWidget(std::move(ne));
                 testersList.push_back(w);
             }
         }
@@ -228,6 +273,18 @@ class VotingTesters : public Wt::WContainerWidget
             return email;
         }
 
+        virtual void save()
+        {
+            std::cout << "[VotingTesters] saving ...\n";
+            notify(READY);
+        };
+
+        void dataChanged(int value)
+        {
+            std::cout << "Tester voters changed!\n";
+            notify(value);
+        }
+
     private:
 
         Postgresql db_;
@@ -237,7 +294,7 @@ class VotingTesters : public Wt::WContainerWidget
 /**
  *
  **/
-class VotePosibilities : public Wt::WContainerWidget
+class VotePosibilities : public WidgetPanel
 {
     public:
 
@@ -264,6 +321,11 @@ class VotePosibilities : public Wt::WContainerWidget
             cb->setInline(false);
         }
 
+        virtual void save()
+        {
+            std::cout << "[VotePosibilities] saving ...\n";
+        };
+
     private:
 
         Postgresql db_;
@@ -272,7 +334,7 @@ class VotePosibilities : public Wt::WContainerWidget
 /**
  *
  **/
-class VoteAlternatives : public Wt::WContainerWidget
+class VoteAlternatives : public WidgetPanel
 {
     public:
 
@@ -293,23 +355,38 @@ class VoteAlternatives : public Wt::WContainerWidget
             buttonAdd->clicked().connect(this, &VoteAlternatives::add);
         }
 
+        virtual void save()
+        {
+            std::cout << "[VoteAlternatives] saving ...\n";
+            notify(READY);
+        };
+
     private:
 
         Postgresql db_;
         std::vector<Wt::WLineEdit*> input_;
 
-        void add() {
+        void add()
+        {
             Wt::WLineEdit *edit = addWidget(std::make_unique<Wt::WLineEdit>());
             edit->addStyleClass("form-control");
             edit->setPlaceholderText("Alternative " + std::to_string(input_.size()));
             edit->setInline(false);
+            edit->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    notify(CHANGED);
+                });
             input_.push_back(edit);
         }
 
-        void remove() {
-            if(input_.size()>0) {
+        void remove()
+        {
+            if(input_.size()>0)
+            {
                 removeWidget(input_[input_.size()-1]);
                 input_.pop_back();
+                notify(CHANGED);
             }
         }
 };
@@ -317,8 +394,8 @@ class VoteAlternatives : public Wt::WContainerWidget
 /**
  * Form: question or convocatory for the voters.
  **/
-class VoterQuestion : public Wt::WContainerWidget {
-
+class VoterQuestion : public WidgetPanel
+{
     public:
 
         VoterQuestion(
@@ -332,54 +409,22 @@ class VoterQuestion : public Wt::WContainerWidget {
             convocatory_ = addWidget(std::make_unique<Wt::WTextArea>());
             convocatory_->setColumns(40);
             convocatory_->setRows(5);
+            convocatory_->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    notify(CHANGED);
+                });
 
             addWidget(std::make_unique<Wt::WText>("Encabezado en voto:"));
 
             question_ = addWidget(std::make_unique<Wt::WTextArea>());
             question_->setColumns(40);
             question_->setRows(2);
-
-            /**
-             * Beginning of the voting.
-             **/
-
-            auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
-            rowA->addStyleClass("row");
-
-            auto cellA0 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellA0->addStyleClass("col-md-4");
-            cellA0->addWidget(std::make_unique<Wt::WText>("Begining:"));
-
-            auto cellA1 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellA1->addStyleClass("col-md-4");
-            auto beginDay = cellA1->addWidget(std::make_unique<Wt::WDateEdit>());
-            beginDay->setDate(Wt::WDate::currentServerDate().addDays(1));
-
-            auto cellA2 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellA2->addStyleClass("col-md-4");
-            auto beginHour = cellA2->addWidget(std::make_unique<Wt::WTimeEdit>());
-            beginHour->setTime(Wt::WTime::currentTime());
-
-            /**
-             * Beginning of the voting.
-             **/
-
-            auto rowB = addWidget(std::make_unique<Wt::WContainerWidget>());
-            rowB->addStyleClass("row");
-
-            auto cellB0 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellB0->addStyleClass("col-md-4");
-            cellB0->addWidget(std::make_unique<Wt::WText>("Begining:"));
-
-            auto cellB1 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellB1->addStyleClass("col-md-4");
-            auto endingDay = cellB1->addWidget(std::make_unique<Wt::WDateEdit>());
-            endingDay->setDate(Wt::WDate::currentServerDate().addDays(2));
-
-            auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellB2->addStyleClass("col-md-4");
-            auto endingHour = cellB2->addWidget(std::make_unique<Wt::WTimeEdit>());
-            endingHour->setTime(Wt::WTime::currentTime());
+            question_->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    notify(CHANGED);
+                });
 
             /**
              * Number of minister of faith.
@@ -395,7 +440,18 @@ class VoterQuestion : public Wt::WContainerWidget {
             cellC1->addStyleClass("col-xs-6");
             Wt::WSpinBox *sb = cellC1->addWidget(std::make_unique<Wt::WSpinBox>());
             sb->setRange(0,4);
+            sb->valueChanged().connect(
+                [=] (const int&)
+                {
+                    notify(CHANGED);
+                });
         }
+
+        virtual void save()
+        {
+            std::cout << "[VoterQuestion] saving ...\n";
+            notify(READY);
+        };
 
     private:
 
@@ -410,7 +466,7 @@ class VoterQuestion : public Wt::WContainerWidget {
 /**
  *
  **/
-class VotingSelection : public Wt::WContainerWidget
+class VotingSelection : public WidgetPanel
 {
     public:
 
@@ -448,7 +504,6 @@ class VotingSelection : public Wt::WContainerWidget
                 i++;
             }
 
-            // Wt::WSelectionBox *sb1 = addNew<Wt::WSelectionBox>();
             Wt::WSelectionBox *sb1 = cellA0->addWidget(std::make_unique<Wt::WSelectionBox>());
             // sb1->addItem("Heavy");
             // sb1->addItem("Medium");
@@ -498,8 +553,6 @@ class VotingSelection : public Wt::WContainerWidget
         std::string selected_;
         Wt::WLineEdit *newName_= nullptr;
         Wt::WPushButton *useSelected_= nullptr;
-
-        // std::vector<Wt::WLineEdit*> input_;
 
         void create()
         {
@@ -587,13 +640,35 @@ class GeneralLayout : public Wt::WContainerWidget
             cellA1->addStyleClass("col-md-8");
 
             stack = cellA1->addNew<Wt::WStackedWidget>();
-            stack->addNew<VotingSelection>(db_, indexVoting_);
-            stack->addNew<VoterQuestion>(db_, indexVoting_);
-            stack->addNew<VoteAlternatives>(db_, indexVoting_);
-            stack->addNew<VotePosibilities>(db_, indexVoting_);
-            stack->addNew<VotingTesters>(db_, indexVoting_);
-            stack->addNew<VotingPeople>(db_, indexVoting_);
-            stack->addNew<VotingType>(db_, indexVoting_);
+
+            auto vSel= std::make_unique<VotingSelection>(db_, indexVoting_);
+            vSel->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            stack->addWidget(std::move(vSel));
+
+            auto vQuest= std::make_unique<VoterQuestion>(db_, indexVoting_);
+            vQuest->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            stack->addWidget(std::move(vQuest));
+
+            auto vAlt= std::make_unique<VoteAlternatives>(db_, indexVoting_);
+            vAlt->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            stack->addWidget(std::move(vAlt));
+
+            auto vPos= std::make_unique<VotePosibilities>(db_, indexVoting_);
+            vPos->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            stack->addWidget(std::move(vPos));
+
+            auto vTest= std::make_unique<VotingTesters>(db_, indexVoting_);
+            vTest->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            stack->addWidget(std::move(vTest));
+
+            auto vPeople= std::make_unique<VotingPeople>(db_, indexVoting_);
+            vPeople->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            stack->addWidget(std::move(vPeople));
+
+            auto vType= std::make_unique<VotingType>(db_, indexVoting_);
+            vType->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            stack->addWidget(std::move(vType));
+
             stack->setCurrentIndex(0);
 
             /**
@@ -616,16 +691,16 @@ class GeneralLayout : public Wt::WContainerWidget
             auto cellB21 = rowB2->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB21->addStyleClass("col-xs-6");
 
-            auto bPrev = cellB21->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
+            bPrev = cellB21->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
             bPrev->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
             bPrev->clicked().connect(this, &GeneralLayout::previous);
 
             auto cellB22 = rowB2->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB22->addStyleClass("col-xs-6");
 
-            auto bSave = cellB22->addWidget(std::make_unique<Wt::WPushButton>("Save"));
+            bSave = cellB22->addWidget(std::make_unique<Wt::WPushButton>("Save"));
             bSave->addStyleClass("btn btn-primary btn-lg btn-block btn-success");
-            // save->clicked().connect(this, &GeneralLayout::save);
+            bSave->clicked().connect(this, &GeneralLayout::save);
 
             // cellB3 will have a row with two cells.
             auto cellB3 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -637,31 +712,17 @@ class GeneralLayout : public Wt::WContainerWidget
             auto cellB31 = rowB3->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB31->addStyleClass("col-xs-6");
 
-            auto bCancel = cellB31->addWidget(std::make_unique<Wt::WPushButton>("Cancel"));
+            bDiscard = cellB31->addWidget(std::make_unique<Wt::WPushButton>("Discard"));
             //bCancel->addStyleClass("btn btn-primary btn-lg btn-warning");
-            bCancel->addStyleClass("btn btn-primary btn-lg btn-block btn-warning");
-            // cancel->clicked().connect(this, &GeneralLayout::cancel);
+            bDiscard->addStyleClass("btn btn-primary btn-lg btn-block btn-warning");
+            bDiscard->clicked().connect(this, &GeneralLayout::discard);
 
             auto cellB32 = rowB3->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB32->addStyleClass("col-xs-6");
 
-            auto bNext = cellB32->addWidget(std::make_unique<Wt::WPushButton>("Next"));
+            bNext = cellB32->addWidget(std::make_unique<Wt::WPushButton>("Next"));
             bNext->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
             bNext->clicked().connect(this, &GeneralLayout::next);
-
-            /*
-            auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellB2->addStyleClass("col-md-4");
-            auto buttonPrev = cellB2->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
-            buttonPrev->addStyleClass("btn btn-primary btn-lg btn-block");
-            buttonPrev->clicked().connect(this, &GeneralLayout::previous);
-
-            auto cellB3 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
-            cellB3->addStyleClass("col-md-4");
-            auto buttonNext = cellB3->addWidget(std::make_unique<Wt::WPushButton>("Next"));
-            buttonNext->addStyleClass("btn btn-primary btn-lg btn-block");
-            buttonNext->clicked().connect(this, &GeneralLayout::next);
-            */
         }
 
     private:
@@ -669,6 +730,11 @@ class GeneralLayout : public Wt::WContainerWidget
         int indexVoting_ = -1;
         Postgresql db_;
         Wt::WStackedWidget *stack;
+
+        Wt::WPushButton *bPrev = nullptr;
+        Wt::WPushButton *bSave = nullptr;
+        Wt::WPushButton *bDiscard = nullptr;
+        Wt::WPushButton *bNext = nullptr;
 
         void previous()
         {
@@ -687,6 +753,56 @@ class GeneralLayout : public Wt::WContainerWidget
             {
                 current++;
                 stack->setCurrentIndex(current);
+            }
+        }
+
+        void save()
+        {
+            Wt::WWidget *p= stack->currentWidget();
+            dynamic_cast<WidgetPanel*>(p)->save();
+        }
+
+        void discard()
+        {
+            // Wt::WWidget *p= stack->currentWidget();
+            // dynamic_cast<WidgetPanel*>(p)->discard();  // Nos implemented yet.
+            dataChanged(READY);
+        }
+
+        void dataChanged(int value)
+        {
+            // std::cout << "Data changed! value: " << value << '\n';
+            switch(value)
+            {
+                case READY:
+                {
+                    if((bPrev != nullptr) &&
+                        (bSave != nullptr) &&
+                        (bDiscard != nullptr) &&
+                        (bNext != nullptr))
+                    {
+                        bPrev->enable();
+                        bSave->disable();
+                        bDiscard->disable();
+                        bNext->enable();
+                    }
+                    break;
+                }
+
+                case CHANGED:
+                {
+                    if((bPrev != nullptr) &&
+                        (bSave != nullptr) &&
+                        (bDiscard != nullptr) &&
+                        (bNext != nullptr))
+                    {
+                        bPrev->disable();
+                        bSave->enable();
+                        bDiscard->enable();
+                        bNext->disable();
+                    }
+                    break;
+                }
             }
         }
 };
