@@ -28,6 +28,12 @@
  * $ ./voting_admin --docroot . --http-address 0.0.0.0 --http-port 9090
  **********************************************************************/
 
+// C++
+#include <vector>
+#include <memory>
+#include <thread>
+#include <chrono>
+
 // Wt
 #include <Wt/WApplication.h>
 #include <Wt/WBootstrapTheme.h>
@@ -53,6 +59,12 @@
 #include <Wt/WLineEdit.h>
 #include <Wt/WPushButton.h>
 #include <Wt/WRegExpValidator.h>
+
+// Boost
+#include <boost/signals2.hpp>
+
+// Voting
+#include "postgresql.h"
 
 namespace {
 
@@ -206,6 +218,30 @@ void passwCreator(Wt::WObject *owner)
 }
 
 }
+
+
+// Boost
+#include <boost/signals2.hpp>
+
+// Voting
+#include "postgresql.h"
+
+const int READY   = 0;
+const int CHANGED = 1;
+const int GRANT_ACCESS = 2;
+const int LOGOUT = 3;
+
+class WidgetPanel: public Wt::WContainerWidget
+{
+    public:
+
+        virtual void save()
+        {
+            std::cout << "[parent] saving ...\n";
+        };
+
+        boost::signals2::signal<void (int)> notify;
+};
 
 #include <Wt/WTable.h>
 #include <Wt/WTableCell.h>
@@ -492,11 +528,13 @@ class MinisterPassw : public Wt::WContainerWidget {
 /**
  * The web widget.
  **/
-class AdminLayout : public Wt::WContainerWidget {
-
+// class AdminLayout : public Wt::WContainerWidget {
+class AdminLayout : public WidgetPanel
+{
     public:
 
-        AdminLayout() {
+        AdminLayout(const Postgresql &db): db_(db)
+        {
             addStyleClass("container");
 
             /**
@@ -566,23 +604,38 @@ class AdminLayout : public Wt::WContainerWidget {
 
             auto cellB0 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB0->addStyleClass("col-md-4");
-            auto buttonPrev = cellB0->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
-            buttonPrev->addStyleClass("btn btn-primary btn-lg btn-block");
-            buttonPrev->clicked().connect(this, &AdminLayout::previous);
+            bPrev = cellB0->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
+            bPrev->addStyleClass("btn btn-primary btn-lg btn-block");
+            bPrev->clicked().connect(this, &AdminLayout::previous);
 
             auto cellB1 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB1->addStyleClass("col-md-4");
-            auto buttonNext = cellB1->addWidget(std::make_unique<Wt::WPushButton>("Next"));
-            buttonNext->addStyleClass("btn btn-primary btn-lg btn-block");
-            buttonNext->clicked().connect(this, &AdminLayout::next);
+            bNext = cellB1->addWidget(std::make_unique<Wt::WPushButton>("Next"));
+            bNext->addStyleClass("btn btn-primary btn-lg btn-block");
+            bNext->clicked().connect(this, &AdminLayout::next);
 
             auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB2->addStyleClass("col-md-4");
+            bLogout= cellB2->addWidget(std::make_unique<Wt::WPushButton>("Close"));
+            bLogout->addStyleClass("btn btn-default btn-lg btn-block");
+            bLogout->clicked().connect(
+                [=]()
+                {
+                    notify(LOGOUT);
+                });
+
         }
 
     private:
 
+        Postgresql db_;
         Wt::WStackedWidget *stack;
+
+        Wt::WPushButton *bPrev = nullptr;
+        // Wt::WPushButton *bSave = nullptr;
+        // Wt::WPushButton *bDiscard = nullptr;
+        Wt::WPushButton *bNext = nullptr;
+        Wt::WPushButton *bLogout = nullptr;
 
         void previous() {
             int current = stack->currentIndex();
@@ -601,6 +654,175 @@ class AdminLayout : public Wt::WContainerWidget {
         }
 };
 
+class FrontAccess: public WidgetPanel
+{
+    public:
+
+        FrontAccess(
+            const Postgresql &db,
+            const std::string &lookup): db_(db), lookup_(lookup)
+        {
+            auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowA->addStyleClass("row");
+
+            auto cellA0 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA0->addStyleClass("col-md-4");
+
+            auto cellA1 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA1->addStyleClass("col-md-4");
+
+            iPassword= cellA1->addWidget(std::make_unique<Wt::WLineEdit>());
+            iPassword->setEchoMode(Wt::EchoMode::Password);
+            iPassword->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    std::cout << "key press\n";
+                    if(e.key() == Wt::Key::Enter)
+                    {
+                        std::cout << "right!\n";
+                        if(bGo != nullptr)
+                        {
+                            verify();
+                        }
+                    }
+                });
+
+            auto cellA2 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA2->addStyleClass("col-md-4");
+
+            // rowB
+
+            auto rowB = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowB->addStyleClass("row");
+
+            auto cellB0 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB0->addStyleClass("col-md-4");
+
+            auto cellB1 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB1->addStyleClass("col-md-4");
+
+            tResult= cellB1->addWidget(std::make_unique<Wt::WText>());
+
+            auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB2->addStyleClass("col-md-4");
+
+            // rowC
+
+            auto rowC = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowC->addStyleClass("row");
+
+            auto cellC0 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellC0->addStyleClass("col-md-4");
+
+            auto cellC1 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellC1->addStyleClass("col-md-4");
+
+            bGo= cellC1->addWidget(std::make_unique<Wt::WPushButton>("Go"));
+            bGo->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
+            bGo->clicked().connect(
+                [=]()
+                {
+                    verify();
+                }
+            );
+
+            auto cellC2 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellC2->addStyleClass("col-md-4");
+        }
+
+    private:
+
+        std::string lookup_;
+        Postgresql db_;
+        Wt::WPushButton *bGo= nullptr;
+        Wt::WText *tResult= nullptr;
+        Wt::WLineEdit *iPassword= nullptr;
+
+        void verify()
+        {
+            std::string passw;
+            std::cout << "Go!\n";\
+            if(iPassword != nullptr)
+            {
+                passw= iPassword->text().toUTF8();
+                if(passw == "hola")
+                {
+                    notify(GRANT_ACCESS);
+                }
+                else
+                {
+                    if((tResult != nullptr) && (iPassword != nullptr))
+                    {
+                        tResult->setText("wrong");
+                        iPassword->disable();
+                        bGo->disable();
+                        Wt::WApplication::instance()->processEvents();
+                        std::cout << "================ disabling ... ================\n";
+
+                        std::this_thread::sleep_for(std::chrono::seconds(3));
+
+                        iPassword->enable();
+                        bGo->enable();
+                        tResult->setText("");
+                        iPassword->setText("");
+                        Wt::WApplication::instance()->processEvents();
+                        std::cout << "================ ... enabling ================\n";
+                    }
+                }
+            }
+        }
+};
+
+template <typename T>
+class FrontSwitch : public Wt::WContainerWidget
+{
+    public:
+
+        FrontSwitch(
+            const Postgresql &db,
+            const std::string &lookup): db_(db), lookup_(lookup)
+        {
+            addStyleClass("container");
+            fa= addWidget(std::make_unique<FrontAccess>(db_, lookup_));
+            fa->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+        }
+
+    private:
+
+        std::string lookup_;
+        Postgresql db_;
+        FrontAccess *fa = nullptr;
+        T *gl = nullptr;
+
+        void react(int value)
+        {
+            switch(value)
+            {
+                case GRANT_ACCESS:
+                {
+                    if(fa != nullptr)
+                    {
+                        removeWidget(fa);
+                        gl= addWidget(std::make_unique<T>(db_));
+                        gl->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+                    }
+                    break;
+                }
+
+                case LOGOUT:
+                {
+                    if(gl != nullptr)
+                    {
+                        removeWidget(gl);
+                        fa= addWidget(std::make_unique<FrontAccess>(db_, lookup_));
+                        fa->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+                    }
+                    break;
+                }
+            }
+        }
+};
+
 /**
  * The web application.
  **/
@@ -608,7 +830,10 @@ class AdminApp : public Wt::WApplication {
 
     public:
 
-        AdminApp(const Wt::WEnvironment& env) : WApplication(env) {
+        AdminApp(
+            const Wt::WEnvironment& env,
+            const Postgresql &db): WApplication(env), db_(db)
+        {
             setTitle("Voting System: administration of the voting");
 
             if(appRoot().empty()) {
@@ -629,13 +854,55 @@ class AdminApp : public Wt::WApplication {
             useStyleSheet("https://getbootstrap.com/docs/3.4/examples/grid/grid.css");
             useStyleSheet("https://getbootstrap.com/docs/3.4/examples/theme/theme.css");
 
-            root()->addNew<AdminLayout>();
+            // root()->addNew<AdminLayout>();
+            root()->addNew<FrontSwitch<AdminLayout>>(db_, "administration");
         }
+
+    private:
+
+        Postgresql db_;
+};
+
+/// Wt
+#include <Wt/WApplication.h>
+
+/// Boost
+#include <boost/bind.hpp>
+
+class AppGenerator
+{
+    public:
+        AppGenerator(const Postgresql &db): db_(db)
+        {}
+
+        std::unique_ptr<AdminApp> createApp(const Wt::WEnvironment& env)
+        {
+            return std::make_unique<AdminApp>(env, db_);
+        }
+
+    private:
+
+        Postgresql db_;
 };
 
 /**
  * Main
  **/
+
+int main(int argc, char **argv)
+{
+    Postgresql db("voting00");
+
+    AppGenerator ag(db);
+
+    return Wt::WRun(
+        argc,
+        argv,
+        boost::bind(&AppGenerator::createApp, &ag, _1));
+}
+
+
+/*
 int main(int argc, char **argv)
 {
     return Wt::WRun(
@@ -647,3 +914,4 @@ int main(int argc, char **argv)
         }
     );
 }
+*/

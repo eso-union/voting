@@ -58,8 +58,11 @@
 // Voting
 #include "postgresql.h"
 
-const int READY   = 0;
-const int CHANGED = 1;
+const int READY        = 0;
+const int CHANGED      = 1;
+const int GRANT_ACCESS = 2;
+const int LOGOUT       = 3;
+const int SELECTED     = 4;
 
 class WidgetPanel: public Wt::WContainerWidget
 {
@@ -70,7 +73,15 @@ class WidgetPanel: public Wt::WContainerWidget
             std::cout << "[parent] saving ...\n";
         };
 
-        boost::signals2::signal<void (int)> notify;
+        virtual void setup(
+            const int &type,
+            const int &value)
+        {
+            std::cout << "[parent] setting up ...\n";
+        }
+
+        boost::signals2::signal<void(int)> notify;
+        // boost::signals2::signal<void(int, int)> setup;
 };
 
 class VotingType : public WidgetPanel {
@@ -256,10 +267,11 @@ class VotingTesters : public WidgetPanel
                 auto ne = std::make_unique<NameEmail>();
                 ne->notify.connect(boost::bind(&VotingTesters::dataChanged, this, _1));
                 auto w= addWidget(std::move(ne));
-                testersList.push_back(w);
+                testersList_.push_back(w);
             }
         }
 
+        /*
         int size() const
         {
             return testersList.size();
@@ -276,10 +288,64 @@ class VotingTesters : public WidgetPanel
             const std::string email= testersList.at(index)->getEmail();
             return email;
         }
+        */
+
+        virtual void setup(
+            const int &type,
+            const int &value)
+        {
+            if(type == SELECTED)
+            {
+                selected_= value;
+
+                std::string sentence=
+                    "SELECT name, email "
+                    "FROM testers "
+                    "WHERE idx_general=" + std::to_string(selected_);
+
+                std::cout << "sentence:" << sentence << "\n";
+
+                pqxx::result answer;
+                db_.execSql(sentence, answer);
+                pqxx::result::iterator row= answer.begin();
+                if(row != answer.end())
+                {
+                    std::string name= row[0].as(std::string());
+                    std::string email= row[1].as(std::string());
+                    auto ne = std::make_unique<NameEmail>(name, email);
+                    ne->notify.connect(boost::bind(&VotingTesters::dataChanged, this, _1));
+                    auto w= addWidget(std::move(ne));
+                    testersList_.push_back(w);
+                    row++;
+                }
+            }
+        }
 
         virtual void save()
         {
             std::cout << "[VotingTesters] saving ...\n";
+            std::vector<std::string> bundle;
+
+            // Error handling, try-catch.
+            std::string delSentence=
+                "DELETE FROM testers "
+                "WHERE idx_general=" + std::to_string(selected_);
+            bundle.push_back(delSentence);
+
+            for(auto &e: testersList_)
+            {
+                const std::string name= e->getName();
+                const std::string email= e->getEmail();
+                if((name != "") && (email != ""))
+                {
+                    std::string insertSentence=
+                        "INSERT INTO testers(idx_general, name, email) "
+                        "VALUES(" + std::to_string(selected_) + ", '" + name + "', '" + email + "')";
+                    bundle.push_back(insertSentence);
+                }
+            }
+
+            db_.execSql(bundle);
             notify(READY);
         };
 
@@ -291,8 +357,9 @@ class VotingTesters : public WidgetPanel
 
     private:
 
+        int selected_= -1;
         Postgresql db_;
-        std::vector<NameEmail*> testersList;
+        std::vector<NameEmail*> testersList_;
 };
 
 /**
@@ -362,17 +429,67 @@ class VoteAlternatives : public WidgetPanel
         virtual void save()
         {
             std::cout << "[VoteAlternatives] saving ...\n";
+            std::vector<std::string> bundle;
+
+            // Error handling, try-catch.
+            std::string delSentence=
+                "DELETE FROM alternatives "
+                "WHERE idx_general=" + std::to_string(selected_);
+            bundle.push_back(delSentence);
+
+            for(auto &e: input_)
+            {
+                std::string insertSentence=
+                    "INSERT INTO alternatives(idx_general, value) "
+                    "VALUES(" + std::to_string(selected_) + ", '" + e->text().toUTF8() + "')";
+                bundle.push_back(insertSentence);
+            }
+
+            db_.execSql(bundle);
             notify(READY);
         };
 
+        virtual void setup(
+            const int &type,
+            const int &value)
+        {
+            if(type == SELECTED)
+            {
+                selected_= value;
+
+                std::string sentence=
+                    "SELECT value "
+                    "FROM alternatives "
+                    "WHERE idx_general=" + std::to_string(selected_);
+
+                std::cout << "sentence:" << sentence << "\n";
+
+                pqxx::result answer;
+                db_.execSql(sentence, answer);
+                pqxx::result::iterator row= answer.begin();
+                if(row != answer.end())
+                {
+                    std::cout << "row[0]:" << row[0].as(std::string()) << "\n";
+                    add(row[0].as(std::string()));
+                    row++;
+                }
+            }
+        }
+
     private:
 
+        int selected_= -1;
         Postgresql db_;
         std::vector<Wt::WLineEdit*> input_;
 
         void add()
         {
-            Wt::WLineEdit *edit = addWidget(std::make_unique<Wt::WLineEdit>());
+            add("");
+        }
+
+        void add(const std::string &text)
+        {
+            Wt::WLineEdit *edit = addWidget(std::make_unique<Wt::WLineEdit>(text));
             edit->addStyleClass("form-control");
             edit->setPlaceholderText("Alternative " + std::to_string(input_.size()));
             edit->setInline(false);
@@ -407,7 +524,6 @@ class VoterQuestion : public WidgetPanel
             const int &indexVoting): db_(db)
         {
             addWidget(std::make_unique<Wt::WText>("<h3>General settings</h3>"));
-
             addWidget(std::make_unique<Wt::WText>("Convocatory to voters:"));
 
             convocatory_ = addWidget(std::make_unique<Wt::WTextArea>());
@@ -454,11 +570,44 @@ class VoterQuestion : public WidgetPanel
         virtual void save()
         {
             std::cout << "[VoterQuestion] saving ...\n";
+
+            // Error handling, try-catch.
+            std::string sentence=
+                "UPDATE general "
+                "SET convocatory='" + convocatory_->text().toUTF8() + "', "
+                "header='" + question_->text().toUTF8() + "' "
+                "WHERE idx=" + std::to_string(selected_);
+            db_.execSql(sentence);
             notify(READY);
         };
 
+        virtual void setup(
+            const int &type,
+            const int &value)
+        {
+            if(type == SELECTED)
+            {
+                selected_= value;
+
+                std::string sentence=
+                    "SELECT convocatory, header "
+                    "FROM general "
+                    "WHERE idx=" + std::to_string(value);
+
+                pqxx::result answer;
+                db_.execSql(sentence, answer);
+                pqxx::result::const_iterator row= answer.begin();
+                if(row != answer.end())
+                {
+                    convocatory_->setText(row[0].as(std::string()));
+                    question_->setText(row[1].as(std::string()));
+                }
+            }
+        }
+
     private:
 
+        int selected_= -1;
         Postgresql db_;
         Wt::WTextArea *convocatory_= nullptr;
         Wt::WTextArea *question_= nullptr;
@@ -503,67 +652,66 @@ class VotingSelection : public WidgetPanel
                     << row[1].as(std::string()) << "\n";
 
                 model->addString(row[1].as(std::string()));
-                model->setData(i, 0, row[0].as(std::string()), Wt::ItemDataRole::User);
+                // model->setData(i, 0, row[0].as(std::string()), Wt::ItemDataRole::User);  // it works!
+                model->setData(i, 0, row[0].as(int()), Wt::ItemDataRole::User);
                 row++;
                 i++;
             }
 
-            Wt::WSelectionBox *sb1 = cellA0->addWidget(std::make_unique<Wt::WSelectionBox>());
-            // sb1->addItem("Heavy");
-            // sb1->addItem("Medium");
-            // sb1->addItem("Light");
-            // sb1->setCurrentIndex(0); // Check if at least exist one element
-
+            Wt::WSelectionBox *sb1= cellA0->addWidget(std::make_unique<Wt::WSelectionBox>());
             sb1->setNoSelectionEnabled(true);
             sb1->setModel(model);
             sb1->setMargin(10, Wt::Side::Right);
 
-            Wt::WText *out = addNew<Wt::WText>("");
+            Wt::WText *out= addNew<Wt::WText>("");
 
             sb1->activated().connect(
                 [=]
                 {
-                    // out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
-                    selected_= sb1->currentText().toUTF8();
-
+                    std::string text= sb1->currentText().toUTF8();
                     int index = sb1->currentIndex();
-                    Wt::WString info = Wt::asString(model->data(model->index(index,0), Wt::ItemDataRole::User));
+                    // Wt::WString info= Wt::asString(model->data(model->index(index,0), Wt::ItemDataRole::User)); // it works!
+                    // int info= Wt::asNumber(model->data(model->index(index,0), Wt::ItemDataRole::User));
+                    selected_= Wt::asNumber(
+                        model->data(
+                            model->index(index, 0),
+                            Wt::ItemDataRole::User));
 
                     // out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
-                    out->setText(Wt::WString("You selected {1} with index {2}.").arg(selected_).arg(index));
+                    out->setText(Wt::WString("You selected {1} with index {2}.").arg(text).arg(selected_));
                 });
 
-            // auto continue = addWidget(std::make_unique<Wt::WPushButton>("Continue with selection"));
             useSelected_= cellA0->addWidget(std::make_unique<Wt::WPushButton>("Continue with selection"));
             useSelected_->addStyleClass("btn btn-warning");
-            useSelected_->clicked().connect(this, &VotingSelection::selected);
+            useSelected_->clicked().connect(
+                [=]()
+                {
+                    tellSelected(selected_);
+                });
 
-            auto rowB = addWidget(std::make_unique<Wt::WContainerWidget>());
+            auto rowB= addWidget(std::make_unique<Wt::WContainerWidget>());
             rowB->addStyleClass("row");
 
-            auto cellB0 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            auto cellB0= rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB0->addStyleClass("col-md-4");
 
-            newName_ = cellB0->addWidget(std::make_unique<Wt::WLineEdit>());
+            newName_= cellB0->addWidget(std::make_unique<Wt::WLineEdit>());
 
             auto createVoting = cellB0->addWidget(std::make_unique<Wt::WPushButton>("Create Voting"));
             createVoting->addStyleClass("btn btn-primary");
             createVoting->clicked().connect(this, &VotingSelection::create);
         }
 
+        boost::signals2::signal<void(int)> tellSelected;
+
     private:
 
         Postgresql db_;
-        std::string selected_;
-        Wt::WLineEdit *newName_= nullptr;
+        int selected_= -1;
+        Wt::WLineEdit   *newName_= nullptr;
         Wt::WPushButton *useSelected_= nullptr;
 
         void create()
-        {
-
-        }
-
-        void selected()
         {
 
         }
@@ -617,7 +765,8 @@ class StepInfo : public Wt::WContainerWidget
 /**
  * The web widget.
  **/
-class GeneralLayout : public Wt::WContainerWidget
+// class GeneralLayout : public Wt::WContainerWidget
+class GeneralLayout : public WidgetPanel
 {
     public:
 
@@ -647,6 +796,7 @@ class GeneralLayout : public Wt::WContainerWidget
 
             auto vSel= std::make_unique<VotingSelection>(db_, indexVoting_);
             vSel->notify.connect(boost::bind(&GeneralLayout::dataChanged, this, _1));
+            vSel->tellSelected.connect(boost::bind(&GeneralLayout::useSelected, this, _1));
             stack->addWidget(std::move(vSel));
 
             auto vQuest= std::make_unique<VoterQuestion>(db_, indexVoting_);
@@ -681,9 +831,16 @@ class GeneralLayout : public Wt::WContainerWidget
             auto rowB = addWidget(std::make_unique<Wt::WContainerWidget>());
             rowB->addStyleClass("row");
 
-            // cellB1 will stay empty.
+            // cellB1
             auto cellB1 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB1->addStyleClass("col-md-4");
+            bLogout= cellB1->addWidget(std::make_unique<Wt::WPushButton>("Close"));
+            bLogout->addStyleClass("btn btn-default btn-lg btn-block");
+            bLogout->clicked().connect(
+                [=]()
+                {
+                    notify(LOGOUT);
+                });
 
             // cellB2 will have a row with two cells.
             auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -696,14 +853,14 @@ class GeneralLayout : public Wt::WContainerWidget
             cellB21->addStyleClass("col-xs-6");
 
             bPrev = cellB21->addWidget(std::make_unique<Wt::WPushButton>("Previous"));
-            bPrev->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
+            bPrev->addStyleClass("btn btn-primary btn-lg btn-block");
             bPrev->clicked().connect(this, &GeneralLayout::previous);
 
             auto cellB22 = rowB2->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB22->addStyleClass("col-xs-6");
 
             bSave = cellB22->addWidget(std::make_unique<Wt::WPushButton>("Save"));
-            bSave->addStyleClass("btn btn-primary btn-lg btn-block btn-success");
+            bSave->addStyleClass("btn btn-success btn-lg btn-block");
             bSave->clicked().connect(this, &GeneralLayout::save);
 
             // cellB3 will have a row with two cells.
@@ -718,20 +875,20 @@ class GeneralLayout : public Wt::WContainerWidget
 
             bDiscard = cellB31->addWidget(std::make_unique<Wt::WPushButton>("Discard"));
             //bCancel->addStyleClass("btn btn-primary btn-lg btn-warning");
-            bDiscard->addStyleClass("btn btn-primary btn-lg btn-block btn-warning");
+            bDiscard->addStyleClass("btn btn-warning btn-lg btn-block");
             bDiscard->clicked().connect(this, &GeneralLayout::discard);
 
             auto cellB32 = rowB3->addWidget(std::make_unique<Wt::WContainerWidget>());
             cellB32->addStyleClass("col-xs-6");
 
             bNext = cellB32->addWidget(std::make_unique<Wt::WPushButton>("Next"));
-            bNext->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
+            bNext->addStyleClass("btn btn-primary btn-lg btn-block");
             bNext->clicked().connect(this, &GeneralLayout::next);
         }
 
     private:
 
-        int indexVoting_ = -1;
+        int indexVoting_= -1;
         Postgresql db_;
         Wt::WStackedWidget *stack;
 
@@ -739,6 +896,18 @@ class GeneralLayout : public Wt::WContainerWidget
         Wt::WPushButton *bSave = nullptr;
         Wt::WPushButton *bDiscard = nullptr;
         Wt::WPushButton *bNext = nullptr;
+        Wt::WPushButton *bLogout = nullptr;
+
+        // Propagate the notification to all panels in the stack.
+        void useSelected(int value)
+        {
+            for(int i=0; i<stack->count(); i++)
+            {
+                Wt::WWidget *p= stack->widget(i);
+                dynamic_cast<WidgetPanel*>(p)->setup(SELECTED, value);
+            }
+            next();
+        }
 
         void previous()
         {
@@ -783,12 +952,14 @@ class GeneralLayout : public Wt::WContainerWidget
                     if((bPrev != nullptr) &&
                         (bSave != nullptr) &&
                         (bDiscard != nullptr) &&
-                        (bNext != nullptr))
+                        (bNext != nullptr) &&
+                        (bLogout != nullptr))
                     {
                         bPrev->enable();
                         bSave->disable();
                         bDiscard->disable();
                         bNext->enable();
+                        bLogout->enable();
                     }
                     break;
                 }
@@ -798,12 +969,14 @@ class GeneralLayout : public Wt::WContainerWidget
                     if((bPrev != nullptr) &&
                         (bSave != nullptr) &&
                         (bDiscard != nullptr) &&
-                        (bNext != nullptr))
+                        (bNext != nullptr) &&
+                        (bLogout != nullptr))
                     {
                         bPrev->disable();
                         bSave->enable();
                         bDiscard->enable();
                         bNext->disable();
+                        bLogout->disable();
                     }
                     break;
                 }
@@ -811,11 +984,14 @@ class GeneralLayout : public Wt::WContainerWidget
         }
 };
 
-class FrontAccess : public Wt::WContainerWidget
+// class FrontAccess : public Wt::WContainerWidget
+class FrontAccess: public WidgetPanel
 {
     public:
 
-        FrontAccess(const Postgresql &db): db_(db)
+        FrontAccess(
+            const Postgresql &db,
+            const std::string &lookup): db_(db), lookup_(lookup)
         {
             auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
             rowA->addStyleClass("row");
@@ -827,6 +1003,7 @@ class FrontAccess : public Wt::WContainerWidget
             cellA1->addStyleClass("col-md-4");
 
             iPassword= cellA1->addWidget(std::make_unique<Wt::WLineEdit>());
+            iPassword->setEchoMode(Wt::EchoMode::Password);
             iPassword->keyPressed().connect(
                 [=] (const Wt::WKeyEvent& e)
                 {
@@ -884,10 +1061,9 @@ class FrontAccess : public Wt::WContainerWidget
             cellC2->addStyleClass("col-md-4");
         }
 
-        boost::signals2::signal<void(int)> access;
-
     private:
 
+        std::string lookup_;
         Postgresql db_;
         Wt::WPushButton *bGo= nullptr;
         Wt::WText *tResult= nullptr;
@@ -902,7 +1078,7 @@ class FrontAccess : public Wt::WContainerWidget
                 passw= iPassword->text().toUTF8();
                 if(passw == "hola")
                 {
-                    access(34);
+                    notify(GRANT_ACCESS);
                 }
                 else
                 {
@@ -928,6 +1104,7 @@ class FrontAccess : public Wt::WContainerWidget
         }
 };
 
+/*
 class FrontSwitch : public Wt::WContainerWidget
 {
     public:
@@ -936,21 +1113,90 @@ class FrontSwitch : public Wt::WContainerWidget
         {
             addStyleClass("container");
             fa= addWidget(std::make_unique<FrontAccess>(db_));
-            fa->access.connect(boost::bind(&FrontSwitch::react, this, _1));
+            fa->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
         }
 
     private:
 
         Postgresql db_;
         FrontAccess *fa = nullptr;
+        GeneralLayout *gl = nullptr;
 
         void react(int value)
         {
-            std::cout << "react: " << value << '\n';
-            if (fa != nullptr)
+            switch(value)
             {
-                removeWidget(fa);
-                addWidget(std::make_unique<GeneralLayout>(db_));
+                case GRANT_ACCESS:
+                {
+                    if(fa != nullptr)
+                    {
+                        removeWidget(fa);
+                        gl= addWidget(std::make_unique<GeneralLayout>(db_));
+                        gl->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+                    }
+                    break;
+                }
+
+                case LOGOUT:
+                {
+                    if(gl != nullptr)
+                    {
+                        removeWidget(gl);
+                        fa= addWidget(std::make_unique<FrontAccess>(db_));
+                        fa->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+                    }
+                }
+            }
+        }
+};
+*/
+
+template <typename T>
+class FrontSwitch : public Wt::WContainerWidget
+{
+    public:
+
+        FrontSwitch(
+            const Postgresql &db,
+            const std::string &lookup): db_(db), lookup_(lookup)
+        {
+            addStyleClass("container");
+            fa= addWidget(std::make_unique<FrontAccess>(db_, lookup_));
+            fa->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+        }
+
+    private:
+
+        std::string lookup_;
+        Postgresql db_;
+        FrontAccess *fa = nullptr;
+        T *gl = nullptr;
+
+        void react(int value)
+        {
+            switch(value)
+            {
+                case GRANT_ACCESS:
+                {
+                    if(fa != nullptr)
+                    {
+                        removeWidget(fa);
+                        gl= addWidget(std::make_unique<T>(db_));
+                        gl->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+                    }
+                    break;
+                }
+
+                case LOGOUT:
+                {
+                    if(gl != nullptr)
+                    {
+                        removeWidget(gl);
+                        fa= addWidget(std::make_unique<FrontAccess>(db_, lookup_));
+                        fa->notify.connect(boost::bind(&FrontSwitch::react, this, _1));
+                    }
+                    break;
+                }
             }
         }
 };
@@ -991,7 +1237,8 @@ class BasicApp : public Wt::WApplication
             // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/cover/cover.css");
 
             // root()->addNew<GeneralLayout>(db_);
-            root()->addNew<FrontSwitch>(db_);
+            // root()->addNew<FrontSwitch>(db_);
+            root()->addNew<FrontSwitch<GeneralLayout>>(db_, "configuration");
         }
 
     private:
