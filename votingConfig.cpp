@@ -31,6 +31,8 @@
 // C++
 #include <vector>
 #include <memory>
+#include <thread>
+#include <chrono>
 
 // Wt
 #include <Wt/WApplication.h>
@@ -78,7 +80,8 @@ class VotingType : public WidgetPanel {
             const Postgresql &db,
             int &indexVoting): db_(db)
         {
-            addWidget(std::make_unique<Wt::WText>("<h3>Choose the type of voting</h3>"));
+            addWidget(std::make_unique<Wt::WText>(
+                "<h3>Choose the type of voting</h3>"));
 
             testingButton_ = addNew<Wt::WRadioButton>("Testing Voting");
             testingButton_->setInline(false);
@@ -207,6 +210,7 @@ class VotingPeople : public WidgetPanel
             emailVoters_->keyPressed().connect(
                 [=] (const Wt::WKeyEvent& e)
                 {
+                    std::cout << "key press ...\n";
                     notify(CHANGED);
                 });
         }
@@ -807,6 +811,150 @@ class GeneralLayout : public Wt::WContainerWidget
         }
 };
 
+class FrontAccess : public Wt::WContainerWidget
+{
+    public:
+
+        FrontAccess(const Postgresql &db): db_(db)
+        {
+            auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowA->addStyleClass("row");
+
+            auto cellA0 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA0->addStyleClass("col-md-4");
+
+            auto cellA1 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA1->addStyleClass("col-md-4");
+
+            iPassword= cellA1->addWidget(std::make_unique<Wt::WLineEdit>());
+            iPassword->keyPressed().connect(
+                [=] (const Wt::WKeyEvent& e)
+                {
+                    std::cout << "key press\n";
+                    if(e.key() == Wt::Key::Enter)
+                    {
+                        std::cout << "right!\n";
+                        if(bGo != nullptr)
+                        {
+                            verify();
+                        }
+                    }
+                });
+
+            auto cellA2 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellA2->addStyleClass("col-md-4");
+
+            // rowB
+
+            auto rowB = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowB->addStyleClass("row");
+
+            auto cellB0 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB0->addStyleClass("col-md-4");
+
+            auto cellB1 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB1->addStyleClass("col-md-4");
+
+            tResult= cellB1->addWidget(std::make_unique<Wt::WText>());
+
+            auto cellB2 = rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellB2->addStyleClass("col-md-4");
+
+            // rowC
+
+            auto rowC = addWidget(std::make_unique<Wt::WContainerWidget>());
+            rowC->addStyleClass("row");
+
+            auto cellC0 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellC0->addStyleClass("col-md-4");
+
+            auto cellC1 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellC1->addStyleClass("col-md-4");
+
+            bGo= cellC1->addWidget(std::make_unique<Wt::WPushButton>("Go"));
+            bGo->addStyleClass("btn btn-primary btn-lg btn-block btn-default");
+            bGo->clicked().connect(
+                [=]()
+                {
+                    verify();
+                }
+            );
+
+            auto cellC2 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
+            cellC2->addStyleClass("col-md-4");
+        }
+
+        boost::signals2::signal<void(int)> access;
+
+    private:
+
+        Postgresql db_;
+        Wt::WPushButton *bGo= nullptr;
+        Wt::WText *tResult= nullptr;
+        Wt::WLineEdit *iPassword= nullptr;
+
+        void verify()
+        {
+            std::string passw;
+            std::cout << "Go!\n";\
+            if(iPassword != nullptr)
+            {
+                passw= iPassword->text().toUTF8();
+                if(passw == "hola")
+                {
+                    access(34);
+                }
+                else
+                {
+                    if((tResult != nullptr) && (iPassword != nullptr))
+                    {
+                        tResult->setText("wrong");
+                        iPassword->disable();
+                        bGo->disable();
+                        Wt::WApplication::instance()->processEvents();
+                        std::cout << "================ disabling ... ================\n";
+
+                        std::this_thread::sleep_for(std::chrono::seconds(3));
+
+                        iPassword->enable();
+                        bGo->enable();
+                        tResult->setText("");
+                        iPassword->setText("");
+                        Wt::WApplication::instance()->processEvents();
+                        std::cout << "================ ... enabling ================\n";
+                    }
+                }
+            }
+        }
+};
+
+class FrontSwitch : public Wt::WContainerWidget
+{
+    public:
+
+        FrontSwitch(const Postgresql &db): db_(db)
+        {
+            addStyleClass("container");
+            fa= addWidget(std::make_unique<FrontAccess>(db_));
+            fa->access.connect(boost::bind(&FrontSwitch::react, this, _1));
+        }
+
+    private:
+
+        Postgresql db_;
+        FrontAccess *fa = nullptr;
+
+        void react(int value)
+        {
+            std::cout << "react: " << value << '\n';
+            if (fa != nullptr)
+            {
+                removeWidget(fa);
+                addWidget(std::make_unique<GeneralLayout>(db_));
+            }
+        }
+};
+
 /**
  * The web application.
  **/
@@ -838,9 +986,12 @@ class BasicApp : public Wt::WApplication
             useStyleSheet("https://getbootstrap.com/docs/3.4/dist/css/bootstrap.min.css");
             // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/starter-template/starter-template.css");
             useStyleSheet("https://getbootstrap.com/docs/3.4/examples/jumbotron/jumbotron.css");
-            useStyleSheet("https://getbootstrap.com/docs/3.4/examples/grid/grid.css");
+            // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/grid/grid.css");
 
-            root()->addNew<GeneralLayout>(db_);
+            // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/cover/cover.css");
+
+            // root()->addNew<GeneralLayout>(db_);
+            root()->addNew<FrontSwitch>(db_);
         }
 
     private:
