@@ -1,9 +1,12 @@
+// C
+#include <cassert>
+
 // C++
 #include <string>
 #include <iostream>
 
 // Wt
-#include <Wt/WSpinBox.h>
+#include <Wt/WBreak.h>
 #include <Wt/WText.h>
 
 // Voting
@@ -17,61 +20,45 @@ Question::Question(const Postgresql &db): Panel(db)
 
     setTitle();
 
-    convocatory_ = addWidget(std::make_unique<Wt::WTextArea>());
-    convocatory_->setColumns(40);
-    convocatory_->setRows(5);
-    convocatory_->keyPressed().connect(
-        [=] (const Wt::WKeyEvent& e)
-        {
-            notify(CHANGED, EMPTY);
-        });
+    wConvocat_= wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());
+    wConvocat_->setColumns(40);
+    wConvocat_->setRows(5);
+    wConvocat_->keyWentDown().connect(this, &Question::keyWentDown);
 
-    addWidget(std::make_unique<Wt::WText>("Encabezado en voto:"));
+    wCanvas_->addWidget(std::make_unique<Wt::WText>("Encabezado en voto:"));
 
-    question_ = addWidget(std::make_unique<Wt::WTextArea>());
-    question_->setColumns(40);
-    question_->setRows(2);
-    question_->keyPressed().connect(
-        [=] (const Wt::WKeyEvent& e)
-        {
-            notify(CHANGED, EMPTY);
-        });
+    wQuestion_= wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());
+    wQuestion_->setColumns(40);
+    wQuestion_->setRows(2);
+    wQuestion_->keyWentDown().connect(this, &Question::keyWentDown);
 
-    /**
-     * Number of minister of faith.
-     **/
-    auto rowC = addWidget(std::make_unique<Wt::WContainerWidget>());
-    rowC->addStyleClass("row");
+    // auto wBreak= addWidget(std::make_unique<Wt::WBreak>());
+    // wOut_= addWidget(std::make_unique<Wt::WText>());
 
-    auto cellC0 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
-    cellC0->addStyleClass("col-xs-6");
-    cellC0->addWidget(std::make_unique<Wt::WText>("Number of minister of faith:"));
-
-    auto cellC1 = rowC->addWidget(std::make_unique<Wt::WContainerWidget>());
-    cellC1->addStyleClass("col-xs-6");
-    Wt::WSpinBox *sb = cellC1->addWidget(std::make_unique<Wt::WSpinBox>());
-    sb->setRange(0,4);
-    sb->valueChanged().connect(
-        [=] (const int&)
-        {
-            notify(CHANGED, EMPTY);
-        });
+    // Verifying pointers
+    assert(wConvocat_ != nullptr);
+    assert(wQuestion_ != nullptr);
 }
 
 void Question::save()
 {
-    std::cout << "[VoterQuestion] saving ...\n";
+    try
+    {
+        std::string sentence=
+            "UPDATE general "
+            "SET convocatory='" + wConvocat_->text().toUTF8() + "', "
+            "header='" + wQuestion_->text().toUTF8() + "' "
+            "WHERE idx=" + std::to_string(idxVoting_);
+        db_.execSql(sentence);
 
-    // Error handling, try-catch.
-    std::string sentence=
-        "UPDATE general "
-        "SET convocatory='" + convocatory_->text().toUTF8() + "', "
-        "header='" + question_->text().toUTF8() + "' "
-        "WHERE idx=" + std::to_string(idxVoting_);
-    db_.execSql(sentence);
-    notify(SAVED, id_);
-    notify(COMPLETED, id_);
-    setCompleted();
+        setSaved();
+        setCompleted();
+    }
+    catch(const std::exception& e)
+    {
+        Wt::log("error") << e.what();
+        wOut_->setText(e.what());
+    }
 };
 
 void Question::setup(
@@ -92,13 +79,20 @@ void Question::setup(
         pqxx::result::const_iterator row= answer.begin();
         if(row != answer.end())
         {
-            convocatory_->setText(row[0].as(std::string()));
-            question_->setText(row[1].as(std::string()));
+            wConvocat_->setText(row[0].as(std::string()));
+            wQuestion_->setText(row[1].as(std::string()));
         }
+        setSaved();
     }
 
     if(isCompleted())
     {
         notify(COMPLETED, id_);
     }
+}
+
+void Question::keyWentDown(const Wt::WKeyEvent& e)
+{
+    notify(CHANGED, EMPTY);
+    wOut_->setText("Modified");
 }

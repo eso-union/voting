@@ -46,8 +46,12 @@ class Panel: public Wt::WContainerWidget
         int settingType_= -1;
         int step_= -1;
         std::string description_= "(empty)";
+        Wt::WContainerWidget *wCanvas_= nullptr;
+        Wt::WText            *wOut_   = nullptr;
 
         void setCompleted();
+
+        void setSaved();
 
         bool isCompleted();
 };

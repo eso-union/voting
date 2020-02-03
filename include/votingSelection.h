@@ -21,16 +21,10 @@ class VotingSelection: public Panel
 
         VotingSelection(const Postgresql &db);
 
-        virtual std::string description();
-
-        // boost::signals2::signal<void(int)> tellSelected;
-
     private:
 
-        // Postgresql db_;
-        // int selected_= -1;
-        Wt::WLineEdit   *newName_= nullptr;
-        Wt::WPushButton *useSelected_= nullptr;
+        Wt::WLineEdit   *wNewName_ = nullptr;
+        Wt::WPushButton *wUseSel_  = nullptr;
 
         void create();
 };

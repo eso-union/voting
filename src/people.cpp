@@ -1,34 +1,80 @@
+// C++
+#include <sstream>
+#include <iostream>
+#include <fstream>
+
+// Wt
+#include <Wt/WFileUpload.h>
+#include <Wt/WProgressBar.h>
+
+// Voting
 #include "people.h"
 
 People::People(const Postgresql &db): Panel(db)
 {
     settingType_= TYPE_CONFIG;
-    step_= STEP_4;
+    step_= STEP_5;
     description_= "Setting up the list of voters";
-
-    // addWidget(std::make_unique<Wt::WText>("<h3>[optional] Name and email for testing</h3>"));
 
     setTitle();
 
-    auto rowA= addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto rowA=
+        wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
     rowA->addStyleClass("row");
 
-    auto buttonRemove= rowA->addWidget(std::make_unique<Wt::WPushButton>("Remove Alternative"));
+    auto buttonRemove=
+        rowA->addWidget(
+            std::make_unique<Wt::WPushButton>("Remove Alternative"));
     buttonRemove->addStyleClass("btn btn-warning");
     buttonRemove->clicked().connect(this, &People::remove);
 
-    auto buttonAdd= rowA->addWidget(std::make_unique<Wt::WPushButton>("Add Alternative"));
+    auto buttonAdd=
+        rowA->addWidget(
+            std::make_unique<Wt::WPushButton>("Add Alternative"));
     buttonAdd->addStyleClass("btn btn-primary");
     buttonAdd->clicked().connect(this, &People::add);
 
-    auto rowB= addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto rowC=
+        wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
+
+// Wt::WFileUpload *fu= addNew<Wt::WFileUpload>();
+// Wt::WFileUpload *fu= rowA->addNew<Wt::WFileUpload>();
+Wt::WFileUpload *fu= rowC->addWidget(
+            std::make_unique<Wt::WFileUpload>());
+// fu->addStyleClass("btn btn-primary");
+fu->setFileTextSize(10); // Set the maximum file size in kB.
+fu->setProgressBar(std::make_unique<Wt::WProgressBar>());
+fu->setMargin(10, Wt::Side::Right);
+
+fu->changed().connect([=] {
+    fu->upload();
+    wOut_->setText("File upload is changed.");
+});
+
+// React to a succesfull upload.
+fu->uploaded().connect([=] {
+    wOut_->setText("File upload is finished.");
+    Wt::log("info") << "File is located:'" << fu->spoolFileName() << "'";
+    fill(fu->spoolFileName());
+});
+
+// React to a file upload problem.
+fu->fileTooLarge().connect([=] {
+    wOut_->setText("File is too large.");
+});
+
+
+    auto rowB=
+        wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
     rowB->addStyleClass("row");
 
-    auto cell0= rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto cell0=
+        rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
     cell0->addStyleClass("col-xs-6");
     cell0->addWidget(std::make_unique<Wt::WText>("Name"));
 
-    auto cell1= rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto cell1=
+        rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
     cell1->addStyleClass("col-xs-6");
     cell1->addWidget(std::make_unique<Wt::WText>("Email address"));
 }
@@ -39,25 +85,35 @@ void People::setup(
 {
     if(type == SELECTED)
     {
-        // Clean up all previous widgets.
-
-        idxVoting_= value;
-
-        // Create new widgets.
-        std::string sentence=
-            "SELECT name, email "
-            "FROM people "
-            "WHERE idx_general=" + std::to_string(idxVoting_);
-
-        pqxx::result answer;
-        db_.execSql(sentence, answer);
-        for(auto row: answer)
+        if(idxVoting_ != value)
         {
-            // const std::string name= row[0].as(std::string());
-            // const std::string email= row[1].as(std::string());
-            const std::string name= row[0].as<std::string>();
-            const std::string email= row[1].as<std::string>();
-            add(name, email);
+            removeAll();
+
+            idxVoting_= value;
+
+            Wt::WString sentence=
+                "SELECT name, email "
+                "FROM people "
+                "WHERE idx_general={1};";
+
+            sentence.arg(idxVoting_);
+
+            pqxx::result answer;
+            auto status= db_.execSql(sentence.toUTF8(), answer);
+            if(status == NO_ERROR)
+            {
+                for(auto row: answer)
+                {
+                    const std::string name= row[0].as<std::string>();
+                    const std::string email= row[1].as<std::string>();
+                    add(name, email);
+                }
+            }
+            else
+            {
+                wOut_->setText(status);
+                return;
+            }
         }
     }
 
@@ -69,22 +125,18 @@ void People::setup(
 
 void People::save()
 {
-    Wt::log("info") << "[People] saving ...";
-
-    std::vector<std::string> codeList= generateCodes(peopleList_.size());
-
-    Wt::log("info") << "1";
+    std::vector<std::string> codeList=
+        generateCodes(cPeopleList_.size());
 
     std::vector<std::string> bundle;
 
-    // Error handling, try-catch.
     std::string delSentence=
         "DELETE FROM people "
         "WHERE idx_general=" + std::to_string(idxVoting_);
     bundle.push_back(delSentence);
 
     int i= 0;
-    for(auto &e: peopleList_)
+    for(auto &e: cPeopleList_)
     {
         const std::string name= e->getName();
         const std::string email= e->getEmail();
@@ -102,10 +154,15 @@ void People::save()
         }
         i++;
     }
-    db_.execSql(bundle);
 
-    notify(SAVED, id_);
-    notify(COMPLETED, id_);
+    auto status= db_.execSql(bundle);
+    if(status != NO_ERROR)
+    {
+        wOut_->setText(status);
+        return;
+    }
+
+    setSaved();
     setCompleted();
 };
 
@@ -125,21 +182,30 @@ void People::add(
 {
     auto ne = std::make_unique<NameEmail>(name, email);
     ne->notify.connect(boost::bind(&People::dataChanged, this, _1));
-    auto w= addWidget(std::move(ne));
-    peopleList_.push_back(w);
+    auto w= wCanvas_->addWidget(std::move(ne));
+    cPeopleList_.push_back(w);
 }
 
 void People::remove()
 {
-    if(peopleList_.size()>0)
+    if(cPeopleList_.size()>0)
     {
-        removeWidget(peopleList_[peopleList_.size()-1]);
-        peopleList_.pop_back();
+        wCanvas_->removeWidget(cPeopleList_[cPeopleList_.size()-1]);
+        cPeopleList_.pop_back();
         notify(CHANGED, EMPTY);
     }
 }
 
-std::vector<std::string> People::generateCodes(const unsigned int &size)
+void People::removeAll()
+{
+    while(cPeopleList_.size() > 0)
+    {
+        remove();
+    }
+}
+
+std::vector<std::string>
+    People::generateCodes(const unsigned int &size)
 {
     std::vector<std::string> codeList;
     // Definion of allowed characters.
@@ -161,4 +227,59 @@ std::vector<std::string> People::generateCodes(const unsigned int &size)
         codeList.push_back(code);
     }
     return codeList;
+}
+
+void People::fill(const std::string &filename)
+{
+    removeAll();
+
+    std::string content= getFileContents(filename);
+
+    std::string line;
+    std::stringstream sstream(content);
+
+    try
+    {
+        while(std::getline(sstream, line, '\n'))
+        {
+            if(line != "")
+            {
+                Wt::log("info") << "line:" << line;
+
+                int pos= line.find(",");
+                std::string email= line.substr(0,pos);
+                std::string name= line.substr(pos+1);
+                // people_list.push_back(union_member);
+                add(name, email);
+            }
+        }
+        // generate_codes();
+        // insert_into_db();
+    }
+    catch(const std::exception &e)
+    {
+        Wt::log("error") << e.what();
+        wOut_->setText(e.what());
+    }
+    catch(...)
+    {
+        Wt::log("error") << "Unhandled exception";
+        wOut_->setText("Unhandled exception");
+    }
+}
+
+std::string
+    People::getFileContents(const std::string &filename)
+{
+    std::string content;
+    std::ifstream input_file(filename.c_str(), std::ios::in | std::ios::binary);
+    if(input_file)
+    {
+        input_file.seekg(0, std::ios::end);
+        content.resize(input_file.tellg());
+        input_file.seekg(0, std::ios::beg);
+        input_file.read(&content[0], content.size());
+        input_file.close();
+    }
+    return(content);
 }

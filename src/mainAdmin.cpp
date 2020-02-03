@@ -35,11 +35,12 @@ class BasicApp: public Wt::WApplication
             // useStyleSheet("https://getbootstrap.com/docs/3.4/dist/css/bootstrap.min.css");
             useStyleSheet("https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css");
             useStyleSheet("https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap-theme.min.css");
-            // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/starter-template/starter-template.css");
-            // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/jumbotron/jumbotron.css");
 
             // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/grid/grid.css");
             useStyleSheet("https://getbootstrap.com/docs/3.4/examples/theme/theme.css");
+
+            // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/starter-template/starter-template.css");
+            useStyleSheet("https://getbootstrap.com/docs/3.4/examples/jumbotron/jumbotron.css");
 
             // root()->addNew<AdminLayout>();
             root()->addNew<Switcher<Administration>>(db_, "administration");
@@ -71,7 +72,7 @@ class AppGenerator
  **/
 int main(int argc, char **argv)
 {
-    Postgresql db("voting00");
+    Postgresql db("voting01");
 
     AppGenerator ag(db);
 

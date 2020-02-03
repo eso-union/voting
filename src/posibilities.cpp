@@ -7,27 +7,24 @@
 Posibilities::Posibilities(const Postgresql &db): Panel(db)
 {
     settingType_= TYPE_CONFIG;
-    step_= STEP_3;
+    step_= STEP_4;
     description_= "Setting up voting posibilities";
 
     setTitle();
 
-    // addStyleClass("container");
-    // addWidget(std::make_unique<Wt::WText>("<h3>Voting Possibilities</h3>"));
-
-    auto wRemove= addWidget(std::make_unique<Wt::WPushButton>("Remove Possibility"));
+    auto wRemove= wCanvas_->addWidget(
+        std::make_unique<Wt::WPushButton>("Remove Possibility"));
     wRemove->addStyleClass("btn btn-warning");
     wRemove->clicked().connect(this, &Posibilities::remove);
 
-    auto wAdd= addWidget(std::make_unique<Wt::WPushButton>("Add Possibility"));
+    auto wAdd= wCanvas_->addWidget(
+        std::make_unique<Wt::WPushButton>("Add Possibility"));
     wAdd->addStyleClass("btn btn-primary");
     wAdd->clicked().connect(this, &Posibilities::add);
 }
 
 void Posibilities::save()
 {
-    std::cout << "[VotePosibilities] saving ...\n";
-
     std::vector<std::string> bundle;
 
     Wt::WString delSentence=
@@ -38,14 +35,14 @@ void Posibilities::save()
 
     bundle.push_back(delSentence.toUTF8());
 
-    for(int i=0; i<input_.size(); i++)
+    for(int i=0; i<cInput_.size(); i++)
     {
         Wt::WString insSentence=
             "INSERT INTO option(idx_general, quantity, allowed) "
             "VALUES({1}, {2}, {3})";
 
         std::string value= "false";
-        if(input_[i]->isChecked())
+        if(cInput_[i]->isChecked())
         {
             value= "true";
         }
@@ -57,9 +54,15 @@ void Posibilities::save()
 
         bundle.push_back(insSentence.toUTF8());
     }
-    db_.execSql(bundle);
-    notify(SAVED, id_);
-    notify(COMPLETED, id_);
+
+    auto status= db_.execSql(bundle);
+    if(status != NO_ERROR)
+    {
+        wOut_->setText(status);
+        return;
+    }
+
+    setSaved();
     setCompleted();
 }
 
@@ -69,24 +72,37 @@ void Posibilities::setup(
 {
     if(type == SELECTED)
     {
-        idxVoting_= value;
-
-        std::string sentence=
-            "SELECT quantity, allowed "
-            "FROM option "
-            "WHERE idx_general=" + std::to_string(idxVoting_) + " "
-            "ORDER BY quantity ASC";
-
-        std::cout << "sentence:" << sentence << "\n";
-
-        pqxx::result answer;
-        db_.execSql(sentence, answer);
-        for(auto row: answer)
+        if(idxVoting_ != value)
         {
-            bool allowed= row[1].as<bool>();
-            // std::cout << "row[0]:" << row[0].as(std::string()) << "\n";
-            add(allowed);  // There is a potential of unsycn between
-                    // the quantity and the one represented by the checkbox.
+            removeAll();
+
+            idxVoting_= value;
+
+            Wt::WString sentence=
+                "SELECT quantity, allowed "
+                "FROM option "
+                "WHERE idx_general={1} "
+                "ORDER BY quantity ASC";
+
+            sentence.arg(idxVoting_);
+
+            pqxx::result answer;
+            auto status= db_.execSql(sentence.toUTF8(), answer);
+            if(status == NO_ERROR)
+            {
+                for(auto row: answer)
+                {
+                    bool allowed= row[1].as<bool>();
+                    add(allowed);  // There is a potential of unsycn between
+                                   // the ordinal and the one represented
+                                   // by the checkbox.
+                }
+            }
+            else
+            {
+                wOut_->setText(status);
+                return;
+            }
         }
     }
 
@@ -103,10 +119,9 @@ void Posibilities::add()
 
 void Posibilities::add(const bool &value)
 {
-    const int total= input_.size();
+    const int total= cInput_.size();
     std::string text= std::to_string(total) + " of the alternatives";
-    Wt::WCheckBox *cb= addNew<Wt::WCheckBox>(text);
-    // cb->addStyleClass("form-control");
+    Wt::WCheckBox *cb= wCanvas_->addNew<Wt::WCheckBox>(text);
     cb->setInline(false);
     cb->setChecked(value);
     cb->changed().connect(
@@ -114,16 +129,24 @@ void Posibilities::add(const bool &value)
         {
             notify(CHANGED, EMPTY);
         });
-    input_.push_back(cb);
+    cInput_.push_back(cb);
     notify(CHANGED, EMPTY);
 }
 
 void Posibilities::remove()
 {
-    if(input_.size()>0)
+    if(cInput_.size()>0)
     {
-        removeWidget(input_[input_.size()-1]);
-        input_.pop_back();
+        wCanvas_->removeWidget(cInput_[cInput_.size()-1]);
+        cInput_.pop_back();
         notify(CHANGED, EMPTY);
+    }
+}
+
+void Posibilities::removeAll()
+{
+    while(cInput_.size() > 0)
+    {
+        remove();
     }
 }

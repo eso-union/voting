@@ -1,10 +1,20 @@
+// C
+#include <cassert>
+
+// Voting
 #include "votingSelection.h"
 
 VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
 {
+    settingType_= TYPE_CONFIG;
+    step_= STEP_0;
+    description_= "Chose or create a voting";
+
+    setTitle();
+
     addStyleClass("container");
 
-    addWidget(std::make_unique<Wt::WText>("<h3>Select or Create Voting</h3>"));
+    // addWidget(std::make_unique<Wt::WText>("<h3>Select or Create Voting</h3>"));
 
     auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
     rowA->addStyleClass("row");
@@ -18,22 +28,6 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
     db_.execSql(sentence, answer);
     auto model= std::make_shared<Wt::WStringListModel>();
     pqxx::result::const_iterator row= answer.begin();
-
-    /*
-    int i= 0;
-    if(row != answer.end())
-    {
-        std::cout
-            << "************ row: "
-            << row[0].as(std::string()) << ", "
-            << row[1].as(std::string()) << "\n";
-
-        model->addString(row[1].as(std::string()));
-        // model->setData(i, 0, row[0].as(std::string()), Wt::ItemDataRole::User);  // it works!
-        model->setData(i, 0, row[0].as(int()), Wt::ItemDataRole::User);
-        row++;
-        i++;
-    }*/
 
     int i= 0;
     for(auto row: answer)
@@ -73,10 +67,10 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
                     "You selected {1} with index {2}.").arg(text).arg(idxVoting_));
         });
 
-    useSelected_= cellA0->addWidget(
+    wUseSel_= cellA0->addWidget(
         std::make_unique<Wt::WPushButton>("Continue with selection"));
-    useSelected_->addStyleClass("btn btn-warning");
-    useSelected_->clicked().connect(
+    wUseSel_->addStyleClass("btn btn-warning");
+    wUseSel_->clicked().connect(
         [=]()
         {
             Wt::log("info") << "idxVoting_: " << idxVoting_;
@@ -95,43 +89,38 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
     auto cellB0= rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
     cellB0->addStyleClass("col-md-4");
 
-    newName_= cellB0->addWidget(std::make_unique<Wt::WLineEdit>());
+    wNewName_= cellB0->addWidget(std::make_unique<Wt::WLineEdit>());
 
     auto createVoting = cellB0->addWidget(std::make_unique<Wt::WPushButton>("Create Voting"));
     createVoting->addStyleClass("btn btn-primary");
     createVoting->clicked().connect(this, &VotingSelection::create);
-}
 
-std::string VotingSelection::description()
-{
-    std::string text= "Chose or create a voting";
-    return text;
+    // Verify pointers
+    assert(wNewName_ != nullptr);
+    assert(wUseSel_  != nullptr);
 }
 
 void VotingSelection::create()
 {
-    // if(newName != nullptr)
-    if(newName_)
+    std::string convocatory= "some text"; // getConvTempalte();
+    std::string header= "some text"; // getHeadTemplate();
+    std::string name= wNewName_->text().toUTF8();
+    std::string link= "(empty)";
+
+    Wt::WString sentence=
+        "INSERT INTO general(name, convocatory, header, link, "
+        "with_ministers, qty_ministers, html, testing, closed, active) "
+        "VALUES('{1}', '{2}', '{3}', '{4}', false, 1, true, true, false, false) "
+        "RETURNING idx";
+
+    sentence
+        .arg(name)
+        .arg(convocatory)
+        .arg(header)
+        .arg(link);
+
+    try
     {
-        Wt::log("info") << "executing create()";
-
-        std::string convocatory= "some text"; // getConvTempalte();
-        std::string header= "some text"; // getHeadTemplate();
-        std::string name= newName_->text().toUTF8();
-
-        // 'name' must be unique
-        Wt::WString sentence=
-            "INSERT INTO general(name, convocatory, header, type, active) "
-            "VALUES('{1}', '{2}', '{3}', {4}, false) "
-            "RETURNING idx";
-
-        sentence
-            .arg(name)
-            .arg(convocatory)
-            .arg(header)
-            .arg(TESTING);
-
-        // try-catch, idx must be different form -1.
         pqxx::result answer;
         db_.execSql(sentence.toUTF8(), answer);
         auto row= answer.begin();
@@ -143,5 +132,10 @@ void VotingSelection::create()
         notify(SELECTED, idxVoting_);
         notify(COMPLETED, id_);
         notify(NEXT, EMPTY);
+    }
+    catch(const std::exception &e)
+    {
+        Wt::log("error") << e.what();
+        Wt::log("error") << sentence;
     }
 }

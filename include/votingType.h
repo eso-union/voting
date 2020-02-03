@@ -27,8 +27,6 @@ class VotingType: public Panel
 
     private:
 
-        int votingType_= -1;
-        std::shared_ptr<Wt::WButtonGroup> group_;
-        Wt::WRadioButton *testingButton_= nullptr;
-        Wt::WRadioButton *realButton_= nullptr;
+        // int votingType_= -1;
+        std::shared_ptr<Wt::WButtonGroup> wGroup_;
 };

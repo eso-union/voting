@@ -13,6 +13,8 @@
 #include "common.h"
 #include "panel.h"
 
+class DescriptionTag;
+
 /**
  *
  **/
@@ -30,12 +32,17 @@ class Alternative: public Panel
 
     private:
 
-
-        std::vector<Wt::WLineEdit*> input_;
+        std::vector<DescriptionTag*> cInput_;
 
         void add();
 
-        void add(const std::string &text);
+        void add(
+            const std::string &description,
+            const std::string &tag);
 
         void remove();
+
+        void removeAll();
+
+        bool checkValues();
 };

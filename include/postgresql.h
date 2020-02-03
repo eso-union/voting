@@ -34,13 +34,18 @@ class Postgresql
 
         // ~Postgresql();
 
-        void execSql(const std::string &sentence);
+        std::string
+            execSql(
+                const std::string &sentence);
 
-        void execSql(
-            const std::string &sentence,
-            pqxx::result &answer);
+        std::string
+            execSql(
+                const std::string &sentence,
+                pqxx::result &answer);
 
-        void execSql(std::vector<std::string> &bundle);
+        std::string
+            execSql(
+                std::vector<std::string> &bundle);
 
         pqxx::result query(
             const std::string &sentence);

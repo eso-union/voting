@@ -5,14 +5,12 @@ project(
     DESCRIPTION "Online Voting System"
     LANGUAGES CXX)
 
-#file(GLOB SOURCES "src/*.cpp")
-#add_executable(testStudent ${SOURCES})
-
 add_executable(voting_config
                src/mainConfig.cpp
                src/stepInfo.cpp
                src/access.cpp
                src/question.cpp
+               src/witness.cpp
                src/posibilities.cpp
                src/people.cpp
                src/postgresql.cpp
@@ -48,6 +46,10 @@ add_executable(cast_vote
                src/sendingVote.cpp
                src/finish.cpp)
 
+
+#target_compile_features(voting_config PUBLIC cxx_std_17)
+#target_compile_features(voting_admin PUBLIC cxx_std_17)
+#target_compile_features(cast_vote PUBLIC cxx_std_17)
 
 
 target_include_directories(voting_config PUBLIC include)

@@ -5,6 +5,7 @@
 #include "posibilities.h"
 #include "people.h"
 #include "votingType.h"
+#include "witness.h"
 
 Configuration::Configuration(const Postgresql &db): Panel(db)
 {
@@ -24,9 +25,17 @@ Configuration::Configuration(const Postgresql &db): Panel(db)
 
     wStack_= cellA1->addNew<Wt::WStackedWidget>();
 
+    insertPanel<VotingSelection>();
+    insertPanel<Question>();
+    insertPanel<Witness>();
+    insertPanel<Alternative>();
+    insertPanel<Posibilities>();
+    insertPanel<People>();
+    insertPanel<VotingType>();
+
+    /*
     auto vSel= std::make_unique<VotingSelection>(db_);
     vSel->notify.connect(boost::bind(&Configuration::react, this, _1, _2));
-    // vSel->tellSelected.connect(boost::bind(&Configuration::useSelected, this, _1));
     wStack_->addWidget(std::move(vSel));
 
     auto vQuest= std::make_unique<Question>(db_);
@@ -44,6 +53,7 @@ Configuration::Configuration(const Postgresql &db): Panel(db)
     auto vTest= std::make_unique<People>(db_);
     vTest->notify.connect(boost::bind(&Configuration::react, this, _1, _2));
     wStack_->addWidget(std::move(vTest));
+    */
 
     /*
     auto vPeople= std::make_unique<VotingPeople>(db_);
@@ -51,9 +61,11 @@ Configuration::Configuration(const Postgresql &db): Panel(db)
     wStack_->addWidget(std::move(vPeople));
     */
 
+    /*
     auto vType= std::make_unique<VotingType>(db_);
     vType->notify.connect(boost::bind(&Configuration::react, this, _1, _2));
     wStack_->addWidget(std::move(vType));
+    */
 
     wStack_->setCurrentIndex(0);
     addInfoBoxes(cellA0);

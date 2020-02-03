@@ -39,7 +39,7 @@ class People: public Panel
 
     private:
 
-        std::vector<NameEmail*> peopleList_;
+        std::vector<NameEmail*> cPeopleList_;
 
         void add();
 
@@ -49,6 +49,11 @@ class People: public Panel
 
         void remove();
 
+        void removeAll();
+
         std::vector<std::string>
             generateCodes(const unsigned int &size);
+
+        void fill(const std::string &filename);
+        std::string getFileContents(const std::string &filename);
 };

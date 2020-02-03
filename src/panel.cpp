@@ -1,3 +1,6 @@
+// C
+#include <cassert>
+
 // Wt
 #include <Wt/WString.h>
 #include <Wt/WText.h>
@@ -8,7 +11,24 @@
 
 Panel::Panel(
     const Postgresql &db): db_(db)
-{}
+{
+    wCanvas_= addWidget(std::make_unique<Wt::WContainerWidget>());
+
+    addWidget(std::make_unique<Wt::WBreak>());
+
+    auto wMsg= addWidget(std::make_unique<Wt::WContainerWidget>());
+    wOut_= wMsg->addWidget(std::make_unique<Wt::WText>());
+
+    Wt::WColor bgColor(206, 242, 255);
+    wOut_->decorationStyle().setBackgroundColor(bgColor);
+
+    Wt::WColor fgColor(0, 60, 255);
+    wOut_->decorationStyle().setForegroundColor(fgColor);
+
+    // Verify pointers
+    assert(wCanvas_ != nullptr);
+    assert(wOut_    != nullptr);
+}
 
 Panel::Panel(
     const Postgresql &db,
@@ -19,7 +39,7 @@ void Panel::setTitle()
 {
     Wt::WString title= "<h3>{1}</h3>";
     title.arg(description_);
-    addWidget(std::make_unique<Wt::WText>(title));
+    wCanvas_->addWidget(std::make_unique<Wt::WText>(title));
 }
 
 void Panel::save()
@@ -64,6 +84,14 @@ void Panel::setCompleted()
         .arg(step_);
 
     db_.execSql(sentence.toUTF8());
+
+    notify(COMPLETED, id_);
+}
+
+void Panel::setSaved()
+{
+    notify(SAVED, id_);
+    wOut_->setText("Saved");
 }
 
 bool Panel::isCompleted()

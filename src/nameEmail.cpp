@@ -29,20 +29,12 @@ NameEmail::NameEmail(
 
 std::string NameEmail::getName()
 {
-    std::string name;
-    if(inputName_ != nullptr)
-    {
-        name= inputName_->text().toUTF8();
-    }
+    std::string name= inputName_->text().toUTF8();
     return name;
 }
 
 std::string NameEmail::getEmail()
 {
-    std::string email;
-    if(inputEmail_ != nullptr)
-    {
-        email= inputEmail_->text().toUTF8();
-    }
+    std::string email= inputEmail_->text().toUTF8();
     return email;
 }

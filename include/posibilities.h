@@ -24,11 +24,13 @@ class Posibilities: public Panel
 
     private:
 
-        std::vector<Wt::WCheckBox*> input_;
+        std::vector<Wt::WCheckBox*> cInput_;
 
         void add();
 
         void add(const bool &value);
 
         void remove();
+
+        void removeAll();
 };

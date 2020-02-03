@@ -79,7 +79,7 @@ class AppGenerator
  **/
 int main(int argc, char **argv)
 {
-    Postgresql db("voting00");
+    Postgresql db("voting01");
 
     /*
     pqxx::result answer;

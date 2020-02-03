@@ -76,8 +76,10 @@ Postgresql::Postgresql(const std::string &host,
 }
 */
 
-void Postgresql::execSql(const std::string &sentence)
+std::string
+    Postgresql::execSql(const std::string &sentence)
 {
+    std::string error;
     try
     {
         /**
@@ -100,21 +102,27 @@ void Postgresql::execSql(const std::string &sentence)
     catch(const pqxx::sql_error &e)
     {
         std::cerr << "Exception: " << e.what() << std::endl;
+        error= e.what();
     }
     catch(const std::exception &e)
     {
         std::cerr << "Exception: " << e.what() << std::endl;
+        error= e.what();
     }
     catch(...)
     {
         std::cerr << "Unhandled exception\n";
+        error= "Unhandled exception";
     }
+    return error;
 }
 
-void Postgresql::execSql(
-    const std::string &sentence,
-    pqxx::result &answer)
+std::string
+    Postgresql::execSql(
+        const std::string &sentence,
+        pqxx::result &answer)
 {
+    std::string error;
     try
     {
         /**
@@ -136,27 +144,27 @@ void Postgresql::execSql(
     }
     catch(const pqxx::sql_error &e)
     {
-        throw(e);
+        std::cerr << "Exception: " << e.what() << std::endl;
+        error= e.what();
     }
     catch(const std::exception &e)
     {
-        /**
-         * All exceptions thrown by libpqxx are
-         * derived from std::exception.
-         **/
         std::cerr << "Exception: " << e.what() << std::endl;
+        error= e.what();
     }
     catch(...)
     {
-        /**
-         * This is unexpected.
-         **/
         std::cerr << "Unhandled exception\n";
+        error= "Unhandled exception";
     }
+    return error;
 }
 
-void Postgresql::execSql(std::vector<std::string> &bundle)
+std::string
+    Postgresql::execSql(
+        std::vector<std::string> &bundle)
 {
+    std::string error;
     try
     {
         /**
@@ -175,15 +183,19 @@ void Postgresql::execSql(std::vector<std::string> &bundle)
     catch(const pqxx::sql_error &e)
     {
         std::cerr << "Exception: " << e.what() << std::endl;
+        error= e.what();
     }
     catch(const std::exception &e)
     {
         std::cerr << "Exception: " << e.what() << std::endl;
+        error= e.what();
     }
     catch(...)
     {
         std::cerr << "Unhandled exception\n";
+        error= "Unhandled exception";
     }
+    return error;
 }
 
 pqxx::result Postgresql::query(

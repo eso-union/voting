@@ -24,6 +24,8 @@ class Question: public Panel
 
     private:
 
-        Wt::WTextArea *convocatory_= nullptr;
-        Wt::WTextArea *question_= nullptr;
+        Wt::WTextArea *wConvocat_= nullptr;
+        Wt::WTextArea *wQuestion_= nullptr;
+
+        void keyWentDown(const Wt::WKeyEvent& e);
 };

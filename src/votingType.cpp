@@ -1,3 +1,7 @@
+// C
+#include <cassert>
+
+// Voting
 #include "votingType.h"
 
 VotingType::VotingType(
@@ -5,25 +9,24 @@ VotingType::VotingType(
     : Panel(db)
 {
     settingType_= TYPE_CONFIG;
-    step_= STEP_5;
+    step_= STEP_6;
     description_= "Setting the type of the voting";
 
     setTitle();
 
-    // addWidget(std::make_unique<Wt::WText>(
-    //    "<h3>Choose the type of voting</h3>"));
+    wGroup_= std::make_shared<Wt::WButtonGroup>();
 
-    group_ = std::make_shared<Wt::WButtonGroup>();
+    auto wTesting=
+        wCanvas_->addNew<Wt::WRadioButton>("Testing Voting");
+    wTesting->setInline(false);
+    wGroup_->addButton(wTesting, 0);
 
-    testingButton_ = addNew<Wt::WRadioButton>("Testing Voting");
-    testingButton_->setInline(false);
-    group_->addButton(testingButton_, 0);
+    auto wReal=
+        wCanvas_->addNew<Wt::WRadioButton>("Real Voting");
+    wReal->setInline(false);
+    wGroup_->addButton(wReal, 1);
 
-    realButton_ = addNew<Wt::WRadioButton>("Real Voting");
-    realButton_->setInline(false);
-    group_->addButton(realButton_, 1);
-
-    group_.get()->checkedChanged().connect(
+    wGroup_.get()->checkedChanged().connect(
         [=] (Wt::WRadioButton *selection)
         {
             notify(CHANGED, EMPTY);
@@ -36,22 +39,29 @@ void VotingType::setup(
 {
     if(type == SELECTED)
     {
-        // Clean up all previous widgets.
-
         idxVoting_= value;
 
-        // Create new widgets.
-        std::string sentence=
-            "SELECT type "
+        Wt::WString sentence=
+            "SELECT testing "
             "FROM general "
-            "WHERE idx=" + std::to_string(idxVoting_);
+            "WHERE idx={1}";
 
-        pqxx::result answer;
-        db_.execSql(sentence, answer);
-        auto row= answer.begin();
-        const int type= row[0].as<int>();
-        group_->setSelectedButtonIndex(type);
-        votingType_= type;
+        sentence.arg(idxVoting_);
+
+        pqxx::result answer= db_.query(sentence.toUTF8());
+        if(answer.begin() != answer.end())
+        {
+            auto row= answer.begin();
+            const bool testing= row[0].as<bool>();
+            if(testing)
+            {
+                wGroup_->setSelectedButtonIndex(0);
+            }
+            else
+            {
+                wGroup_->setSelectedButtonIndex(1);
+            }
+        }
     }
 
     if(isCompleted())
@@ -62,44 +72,28 @@ void VotingType::setup(
 
 void VotingType::save()
 {
-    std::cout << "[VotingType] saving ...\n";
-    // int chosen= group_.get()->id(selection);
-    int chosen= group_->checkedId();
-    Wt::log("info") << "chosen: " << chosen << '\n';
-
-    if(chosen == TESTING)
+    std::string value= "false";
+    if(wGroup_->checkedId() == TESTING)
     {
-        // Error handling, try-catch.
-        std::string sentence=
-            "UPDATE general "
-            "SET type=" + std::to_string(TESTING) + " "
-            "WHERE idx=" + std::to_string(idxVoting_);
-        db_.execSql(std::move(sentence));
-
-        std::cout << "sentence: " << sentence << '\n';
+        value= "true";
     }
-    else if (chosen == REAL)
+
+    Wt::WString sentence=
+        "UPDATE general "
+        "SET testing={1} "
+        "WHERE idx={2} ";
+
+    sentence
+        .arg(value)
+        .arg(idxVoting_);
+
+    auto status= db_.execSql(std::move(sentence.toUTF8()));
+    if(status != NO_ERROR)
     {
-        // There could be only one voting real.
-        // Therefore, all other ones are changed to TESTING.
-        // And this only one set to REAL.
-        std::vector<std::string> bundle;
-
-        std::string sentence=
-            "UPDATE general "
-            "SET type=" + std::to_string(TESTING) + " "
-            "WHERE idx!=" + std::to_string(idxVoting_);
-        bundle.push_back(std::move(sentence));
-
-        sentence=
-            "UPDATE general "
-            "SET type=" + std::to_string(REAL) + " "
-            "WHERE idx=" + std::to_string(idxVoting_);
-        bundle.push_back(std::move(sentence));
-
-        db_.execSql(bundle);
+        wOut_->setText(status);
+        return;
     }
-    notify(SAVED, id_);
-    notify(COMPLETED, id_);
+
+    setSaved();
     setCompleted();
-};
+}

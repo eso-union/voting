@@ -30,6 +30,15 @@ class Configuration: public Panel
         // Propagate the notification to all panels in the stack.
         // void useSelected(int value);
 
+        template<typename T>
+        void insertPanel()
+        {
+            auto p= std::make_unique<T>(db_);
+            p->notify.connect(
+                boost::bind(&Configuration::react, this, _1, _2));
+            wStack_->addWidget(std::move(p));
+        }
+
         void previous();
 
         void next();

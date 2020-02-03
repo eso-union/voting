@@ -28,3 +28,5 @@ const int STEP_3 = 3;
 const int STEP_4 = 4;
 const int STEP_5 = 5;
 const int STEP_6 = 6;
+
+const std::string NO_ERROR = "";
