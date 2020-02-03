@@ -67,9 +67,17 @@ Alternative::Alternative(const Postgresql &db): Panel(db)
 {
     settingType_= TYPE_CONFIG;
     step_= STEP_3;
-    description_= "Setting up voting alternatives";
+    description_= "Setting up question and alternatives";
 
     setTitle();
+
+    wCanvas_->addWidget(
+        std::make_unique<Wt::WText>("Question or request in vote"));
+
+    wQuest_= wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());
+    wQuest_->setColumns(40);
+    wQuest_->setRows(4);
+    wQuest_->keyWentDown().connect(this, &Alternative::keyWentDown);
 
     // The button to remove an alternative
     auto wRemove=
@@ -86,16 +94,27 @@ Alternative::Alternative(const Postgresql &db): Panel(db)
     wAdd->clicked().connect(this, &Alternative::add);
 
     // A description for the user
-    auto wRow= wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto wRow=
+        wCanvas_->addWidget(
+            std::make_unique<Wt::WContainerWidget>());
     wRow->addStyleClass("row");
 
-    auto wCell0= wRow->addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto wCell0=
+        wRow->addWidget(
+            std::make_unique<Wt::WContainerWidget>());
     wCell0->addStyleClass("col-xs-8");
-    wCell0->addWidget(std::make_unique<Wt::WLabel>("Description"));
+    wCell0->addWidget(
+        std::make_unique<Wt::WLabel>("Description"));
 
-    auto wCell1= wRow->addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto wCell1=
+        wRow->addWidget(
+            std::make_unique<Wt::WContainerWidget>());
     wCell1->addStyleClass("col-xs-4");
-    wCell1->addWidget(std::make_unique<Wt::WLabel>("Tag (low case, no spaces)"));
+    wCell1->addWidget(
+        std::make_unique<Wt::WLabel>("Tag (low case, no spaces)"));
+
+    // Verify pointers
+    assert(wQuest_ != nullptr);
 }
 
 void Alternative::save()
@@ -116,17 +135,28 @@ void Alternative::save()
 
     for(auto &e: cInput_)
     {
-        Wt::WString insertSentence=
+        Wt::WString insSentence=
             "INSERT INTO alternative(idx_general, value, tag) "
             "VALUES({1}, '{2}', '{3}')";
 
-        insertSentence
+        insSentence
             .arg(idxVoting_)
             .arg(e->getDescription())
             .arg(e->getTag());
 
-        bundle.push_back(insertSentence.toUTF8());
+        bundle.push_back(insSentence.toUTF8());
     }
+
+    Wt::WString updSentence=
+        "UPDATE general "
+        "SET header='{1}' "
+        "WHERE idx={2}";
+
+    updSentence
+        .arg(wQuest_->text().toUTF8())
+        .arg(idxVoting_);
+
+    bundle.push_back(updSentence.toUTF8());
 
     auto status= db_.execSql(bundle);
     if(status != NO_ERROR)
@@ -145,40 +175,76 @@ void Alternative::setup(
 {
     if(type == SELECTED)
     {
+        bool result= true;
         if(idxVoting_ != value)
         {
-            removeAll();
-
             idxVoting_= value;
-
-            Wt::WString sentence=
-                "SELECT value, tag "
-                "FROM alternative "
-                "WHERE idx_general={1};";
-
-            sentence.arg(idxVoting_);
-            pqxx::result answer;
-            auto status= db_.execSql(sentence.toUTF8(), answer);
-            if(status == NO_ERROR)
-            {
-                for(auto row: answer)
-                {
-                    std::string desc= row[0].as(std::string());
-                    std::string tag=  row[1].as(std::string());
-                    add(desc, tag);
-                }
-            }
-            else
-            {
-                wOut_->setText(status);
-                return;
-            }
+            setData();
         }
 
         if(isCompleted())
         {
             notify(COMPLETED, id_);
         }
+        else
+        {
+            notify(INCOMPLETE, id_);
+        }
+    }
+}
+
+void Alternative::setData()
+{
+    removeAll();
+    getAlternatives();
+    getQuestion();
+}
+
+bool Alternative::getAlternatives()
+{
+    Wt::WString sentence=
+        "SELECT value, tag "
+        "FROM alternative "
+        "WHERE idx_general={1}";
+
+    sentence.arg(idxVoting_);
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        for(auto row: answer)
+        {
+            std::string desc= row[0].as(std::string());
+            std::string tag=  row[1].as(std::string());
+            add(desc, tag);
+        }
+        setSaved();
+    }
+    else
+    {
+        wOut_->setText(status);
+    }
+}
+
+bool Alternative::getQuestion()
+{
+    Wt::WString sentence=
+        "SELECT header "
+        "FROM general "
+        "WHERE idx={1}";
+
+    sentence.arg(idxVoting_);
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        auto row= answer.begin();
+        wQuest_->setText(row[0].as(std::string()));
+        setSaved();
+    }
+    else
+    {
+        wOut_->setText(status);
     }
 }
 
@@ -192,7 +258,8 @@ void Alternative::add(
     const std::string &tag)
 {
     DescriptionTag *wDescTag=
-        wCanvas_->addWidget(std::make_unique<DescriptionTag>(description, tag));
+        wCanvas_->addWidget(
+            std::make_unique<DescriptionTag>(description, tag));
     wDescTag->setInline(false);
     wDescTag->notify.connect(
         [=] (const int &key, const int &value)
@@ -218,6 +285,12 @@ void Alternative::removeAll()
     {
         remove();
     }
+}
+
+void Alternative::keyWentDown(const Wt::WKeyEvent& e)
+{
+    notify(CHANGED, EMPTY);
+    wOut_->setText("Modified");
 }
 
 bool Alternative::checkValues()

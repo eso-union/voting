@@ -33,6 +33,8 @@ class BasicApp: public Wt::WApplication
             bootstrapTheme->setResponsive(true);
             setTheme(bootstrapTheme);
 
+            messageResourceBundle().use(appRoot() + "text");
+
             useStyleSheet("resources/themes/bootstrap/3/bootstrap-theme.min.css");
             useStyleSheet("https://getbootstrap.com/docs/3.4/dist/css/bootstrap.min.css");
             // useStyleSheet("https://getbootstrap.com/docs/3.4/examples/starter-template/starter-template.css");

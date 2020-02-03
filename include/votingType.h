@@ -25,6 +25,8 @@ class VotingType: public Panel
 
         virtual void save();
 
+        virtual void setData();
+
     private:
 
         // int votingType_= -1;

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<messages xmlns:if="Wt.WTemplate.conditions">
+
+<!--a comment-->
+  <message id="convocatory-template-html">
+    <html>
+        <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        </head>
+
+        <body>
+
+            Hola NAME,<br/>&nbsp;<br/>
+
+            Cada uno de los socios est&aacute; convocado a votar
+            en la p&aacute;gina web,<br/>&nbsp;<br/>
+
+            &nbsp;&nbsp;&nbsp;&nbsp;<a href="LINK" target="_blank">LINK</a><br/>&nbsp;<br/>
+
+            Y este es su c&oacute;digo de activaci&oacute;n, &uacute;nico e individual,<br/>&nbsp;<br/>
+
+            &nbsp;&nbsp;&nbsp;&nbsp;<strong>CODIGO</strong><br/>&nbsp;<br/>
+
+            Se sugiere copiarlo y pegarlo en el formulario en linea de votaci&oacute;n.
+
+            <strong>La votaci&oacute;n estara abierta por 24 horas
+            entre el d&iacute;a de inicio y el d&iacute;a de t&eacute;rmino.</strong><br/>&nbsp;<br/>
+
+            <strong>
+            La Directiva
+            </strong>
+
+        </body>
+    </html>
+  </message>
+
+  <message id="convocatory-template-plain">
+
+    Hola NAME,
+
+    Cada uno de los socios esta convocado a votar en la pagina web,
+
+    LINK
+
+    Y este es su codigo de activacion,
+
+    CODIGO
+
+    Se sugiere copiar y pegar ese codigo en el formulario de votacion.
+
+    La votacion estara abierta por 24 horas entre el inicio y termino de este mes.
+
+
+    La Directiva
+
+  </message>
+
+</messages>

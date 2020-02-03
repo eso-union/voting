@@ -1,6 +1,8 @@
 #pragma once
 
 // Wt
+#include <Wt/WCheckBox.h>
+#include <Wt/WLineEdit.h>
 #include <Wt/WTextArea.h>
 
 // Voting
@@ -22,10 +24,13 @@ class Question: public Panel
             const int &type,
             const int &value);
 
+        virtual void setData();
+
     private:
 
         Wt::WTextArea *wConvocat_= nullptr;
-        Wt::WTextArea *wQuestion_= nullptr;
+        Wt::WCheckBox *wHtml_    = nullptr;
+        Wt::WLineEdit *wLink_    = nullptr;
 
         void keyWentDown(const Wt::WKeyEvent& e);
 };

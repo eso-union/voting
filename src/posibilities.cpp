@@ -74,35 +74,8 @@ void Posibilities::setup(
     {
         if(idxVoting_ != value)
         {
-            removeAll();
-
             idxVoting_= value;
-
-            Wt::WString sentence=
-                "SELECT quantity, allowed "
-                "FROM option "
-                "WHERE idx_general={1} "
-                "ORDER BY quantity ASC";
-
-            sentence.arg(idxVoting_);
-
-            pqxx::result answer;
-            auto status= db_.execSql(sentence.toUTF8(), answer);
-            if(status == NO_ERROR)
-            {
-                for(auto row: answer)
-                {
-                    bool allowed= row[1].as<bool>();
-                    add(allowed);  // There is a potential of unsycn between
-                                   // the ordinal and the one represented
-                                   // by the checkbox.
-                }
-            }
-            else
-            {
-                wOut_->setText(status);
-                return;
-            }
+            setData();
         }
     }
 
@@ -110,6 +83,35 @@ void Posibilities::setup(
     {
         notify(COMPLETED, id_);
     }
+}
+
+void Posibilities::setData()
+{
+    removeAll();
+
+    Wt::WString sentence=
+        "SELECT quantity, allowed "
+        "FROM option "
+        "WHERE idx_general={1} "
+        "ORDER BY quantity ASC";
+
+    sentence.arg(idxVoting_);
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        for(auto row: answer)
+        {
+            bool allowed= row[1].as<bool>();
+            add(allowed);  // There is a potential of unsycn between
+                            // the ordinal and the one represented
+                            // by the checkbox.
+        }
+        setSaved();
+        return;
+    }
+    wOut_->setText(status);
 }
 
 void Posibilities::add()

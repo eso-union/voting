@@ -26,6 +26,10 @@ class Panel: public Wt::WContainerWidget
 
         virtual void save();
 
+        virtual void discard();
+
+        virtual void setData();
+
         virtual void setup(
             const int &type,
             const int &value);

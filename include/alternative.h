@@ -8,6 +8,7 @@
 #include <Wt/WLineEdit.h>
 #include <Wt/WPushButton.h>
 #include <Wt/WRadioButton.h>
+#include <Wt/WTextArea.h>
 
 // Voting
 #include "common.h"
@@ -30,8 +31,11 @@ class Alternative: public Panel
             const int &type,
             const int &value);
 
+        virtual void setData();
+
     private:
 
+        Wt::WTextArea *wQuest_= nullptr;
         std::vector<DescriptionTag*> cInput_;
 
         void add();
@@ -45,4 +49,9 @@ class Alternative: public Panel
         void removeAll();
 
         bool checkValues();
+
+        void keyWentDown(const Wt::WKeyEvent& e);
+
+        bool getAlternatives();
+        bool getQuestion();
 };

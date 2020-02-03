@@ -37,32 +37,29 @@ People::People(const Postgresql &db): Panel(db)
     auto rowC=
         wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
 
-// Wt::WFileUpload *fu= addNew<Wt::WFileUpload>();
-// Wt::WFileUpload *fu= rowA->addNew<Wt::WFileUpload>();
-Wt::WFileUpload *fu= rowC->addWidget(
-            std::make_unique<Wt::WFileUpload>());
-// fu->addStyleClass("btn btn-primary");
-fu->setFileTextSize(10); // Set the maximum file size in kB.
-fu->setProgressBar(std::make_unique<Wt::WProgressBar>());
-fu->setMargin(10, Wt::Side::Right);
+    Wt::WFileUpload *fu= rowC->addWidget(
+                std::make_unique<Wt::WFileUpload>());
+    fu->setFileTextSize(10); // Set the maximum file size in kB.
+    fu->setProgressBar(std::make_unique<Wt::WProgressBar>());
+    fu->setMargin(10, Wt::Side::Right);
 
-fu->changed().connect([=] {
-    fu->upload();
-    wOut_->setText("File upload is changed.");
-});
+    fu->changed().connect([=] {
+        fu->upload();
+        wOut_->setText("File upload is changed.");
+    });
 
-// React to a succesfull upload.
-fu->uploaded().connect([=] {
-    wOut_->setText("File upload is finished.");
-    Wt::log("info") << "File is located:'" << fu->spoolFileName() << "'";
-    fill(fu->spoolFileName());
-});
+    // React to a succesfull upload.
+    fu->uploaded().connect([=] {
+        wOut_->setText("File upload is finished.");
+        Wt::log("info") << "File is located:'" << fu->spoolFileName() << "'";
+        fill(fu->spoolFileName());
+        notify(CHANGED, EMPTY);
+    });
 
-// React to a file upload problem.
-fu->fileTooLarge().connect([=] {
-    wOut_->setText("File is too large.");
-});
-
+    // React to a file upload problem.
+    fu->fileTooLarge().connect([=] {
+        wOut_->setText("File is too large.");
+    });
 
     auto rowB=
         wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -87,39 +84,47 @@ void People::setup(
     {
         if(idxVoting_ != value)
         {
-            removeAll();
-
             idxVoting_= value;
-
-            Wt::WString sentence=
-                "SELECT name, email "
-                "FROM people "
-                "WHERE idx_general={1};";
-
-            sentence.arg(idxVoting_);
-
-            pqxx::result answer;
-            auto status= db_.execSql(sentence.toUTF8(), answer);
-            if(status == NO_ERROR)
-            {
-                for(auto row: answer)
-                {
-                    const std::string name= row[0].as<std::string>();
-                    const std::string email= row[1].as<std::string>();
-                    add(name, email);
-                }
-            }
-            else
-            {
-                wOut_->setText(status);
-                return;
-            }
+            setData();
         }
     }
 
     if(isCompleted())
     {
         notify(COMPLETED, id_);
+    }
+    else
+    {
+        notify(INCOMPLETE, id_);
+    }
+}
+
+void People::setData()
+{
+    removeAll();
+
+    Wt::WString sentence=
+        "SELECT name, email "
+        "FROM people "
+        "WHERE idx_general={1};";
+
+    sentence.arg(idxVoting_);
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        for(auto row: answer)
+        {
+            const std::string name= row[0].as<std::string>();
+            const std::string email= row[1].as<std::string>();
+            add(name, email);
+        }
+        setSaved();
+    }
+    else
+    {
+        wOut_->setText(status);
     }
 }
 

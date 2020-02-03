@@ -25,6 +25,8 @@ class Witness: public Panel
             const int &type,
             const int &value);
 
+        virtual void setData();
+
     private:
 
         std::string withMinisters_;

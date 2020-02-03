@@ -37,6 +37,8 @@ class People: public Panel
 
         void dataChanged(int value);
 
+        virtual void setData();
+
     private:
 
         std::vector<NameEmail*> cPeopleList_;

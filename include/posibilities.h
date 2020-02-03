@@ -22,6 +22,8 @@ class Posibilities: public Panel
             const int &type,
             const int &value);
 
+        virtual void setData();
+
     private:
 
         std::vector<Wt::WCheckBox*> cInput_;

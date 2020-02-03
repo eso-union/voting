@@ -90,14 +90,31 @@ void Witness::setup(
     {
         idxVoting_= value;
 
-        Wt::WString sentence=
-            "SELECT with_ministers, qty_ministers "
-            "FROM general "
-            "WHERE idx={1}";
+    }
 
-        sentence.arg(idxVoting_);
+    if(isCompleted())
+    {
+        notify(COMPLETED, id_);
+    }
+    else
+    {
+        notify(INCOMPLETE, id_);
+    }
+}
 
-        pqxx::result answer= db_.query(sentence.toUTF8());
+void Witness::setData()
+{
+    Wt::WString sentence=
+        "SELECT with_ministers, qty_ministers "
+        "FROM general "
+        "WHERE idx={1}";
+
+    sentence.arg(idxVoting_);
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
         if(answer.begin() != answer.end())
         {
             pqxx::result::const_iterator row= answer.begin();
@@ -117,12 +134,10 @@ void Witness::setup(
             int qt= row[1].as(int());
             wQty_->setValue(qt);
         }
+        setSaved();
+        return;
     }
-
-    if(isCompleted())
-    {
-        notify(COMPLETED, id_);
-    }
+    wOut_->setText(status);
 }
 
 void Witness::wIncChanged()
@@ -137,9 +152,11 @@ void Witness::wIncChanged()
         wQty_->disable();
         notify(CHANGED, EMPTY);
     }
+    wOut_->setText("Modified");
 };
 
 void Witness::wQtyValueChanged()
 {
     notify(CHANGED, EMPTY);
+    wOut_->setText("Modified");
 }

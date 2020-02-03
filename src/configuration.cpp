@@ -172,8 +172,8 @@ void Configuration::save()
 
 void Configuration::discard()
 {
-    // Wt::WWidget *p= wStack_->currentWidget();
-    // dynamic_cast<WidgetPanel*>(p)->discard();  // Not implemented yet.
+    Wt::WWidget *p= wStack_->currentWidget();
+    dynamic_cast<Panel*>(p)->discard();
 }
 
 void Configuration::react(

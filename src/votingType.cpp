@@ -30,6 +30,7 @@ VotingType::VotingType(
         [=] (Wt::WRadioButton *selection)
         {
             notify(CHANGED, EMPTY);
+            wOut_->setText("Modified");
         });
 }
 
@@ -40,15 +41,32 @@ void VotingType::setup(
     if(type == SELECTED)
     {
         idxVoting_= value;
+        setData();
+    }
 
-        Wt::WString sentence=
-            "SELECT testing "
-            "FROM general "
-            "WHERE idx={1}";
+    if(isCompleted())
+    {
+        notify(COMPLETED, id_);
+    }
+    else
+    {
+        notify(INCOMPLETE, id_);
+    }
+}
 
-        sentence.arg(idxVoting_);
+void VotingType::setData()
+{
+    Wt::WString sentence=
+        "SELECT testing "
+        "FROM general "
+        "WHERE idx={1}";
 
-        pqxx::result answer= db_.query(sentence.toUTF8());
+    sentence.arg(idxVoting_);
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
         if(answer.begin() != answer.end())
         {
             auto row= answer.begin();
@@ -62,11 +80,11 @@ void VotingType::setup(
                 wGroup_->setSelectedButtonIndex(1);
             }
         }
+        setSaved();
     }
-
-    if(isCompleted())
+    else
     {
-        notify(COMPLETED, id_);
+        wOut_->setText(status);
     }
 }
 

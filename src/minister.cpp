@@ -24,8 +24,6 @@ void Minister::setup(
     const int &type,
     const int &value)
 {
-    Wt::log("info") << "A1 -- id_: " << id_;
-
     if(type == SELECTED)
     {
         if(idxVoting_ != value)

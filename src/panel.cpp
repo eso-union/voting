@@ -47,6 +47,15 @@ void Panel::save()
     std::cout << "[parent] saving ...\n";
 }
 
+void Panel::discard()
+{
+    setData();
+    notify(SAVED, EMPTY);
+}
+
+void Panel::setData()
+{}
+
 void Panel::setup(
     const int &type,
     const int &value)
