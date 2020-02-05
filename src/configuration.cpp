@@ -11,10 +11,12 @@ Configuration::Configuration(const Postgresql &db): Panel(db)
 {
     addStyleClass("container");
 
+    wTitle_= addWidget(std::make_unique<Wt::WText>("<h2>(not selected)</h2>"));
+
     /**
      * Row A
      **/
-    auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto rowA= addWidget(std::make_unique<Wt::WContainerWidget>());
     rowA->addStyleClass("row");
 
     auto cellA0= rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -187,6 +189,7 @@ void Configuration::react(
     {
         case SELECTED:
         {
+            setTitle(value);
             for(int i=0; i<wStack_->count(); i++)
             {
                 Wt::log("info") << "i: " << i;
@@ -197,9 +200,6 @@ void Configuration::react(
         }
         case SAVED:
         {
-            // std::cout << "===== before" << std::endl;
-            // statusDisplay_[value]->setCompleted();
-            // std::cout << "===== after" << std::endl;
             bPrev->enable();
             bSave->disable();
             bDiscard->disable();
@@ -231,16 +231,6 @@ void Configuration::react(
             next();
             break;
         }
-
-        /*
-        case READY:
-        {
-            Wt::log("info")
-                << "Got a READY notification.";
-            break;
-        }
-        */
-
         default:
         {
             Wt::log("info")
@@ -274,5 +264,28 @@ void Configuration::addInfoBoxes(
                     text.toUTF8()));
 
         statusDisplay_.push_back(msgBox);
+    }
+}
+
+void Configuration::setTitle(
+    const int &idx)
+{
+    Wt::WString sentence=
+        "SELECT name "
+        "FROM general "
+        "WHERE idx={1}";
+
+    sentence.arg(idx);
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        if(answer.begin() != answer.end())
+        {
+            auto row= answer.begin();
+            Wt::WString title="<h2>{1}</h2>";
+            title.arg(row[0].as(std::string()));
+            wTitle_->setText(title);
+        }
     }
 }

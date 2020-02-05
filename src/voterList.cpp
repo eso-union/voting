@@ -1,5 +1,7 @@
+// C
+#include <cassert>
+
 // Wt
-#include <Wt/WTable.h>
 #include <Wt/WTextArea.h>
 
 // Voting
@@ -13,23 +15,18 @@ VoterList::VoterList(const Postgresql &db): Panel(db)
 
     setTitle();
 
-    // addWidget(std::make_unique<Wt::WText>("<h3>Approve the list of of voters</h3>"));
-
-    wApprove_ = addWidget(std::make_unique<Wt::WPushButton>("Approve"));
+    wApprove_ = wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Approve"));
     wApprove_->clicked().connect(this, &VoterList::approve);
 
-    auto table= addWidget(Wt::cpp14::make_unique<Wt::WTable>());
-    table->setHeaderCount(1);
-    table->setWidth(Wt::WLength("100%"));
+    wTable_= wCanvas_->addWidget(Wt::cpp14::make_unique<Wt::WTable>());
+    wTable_->setHeaderCount(1);
+    wTable_->setWidth(Wt::WLength("100%"));
 
-    table->elementAt(0, 0)->addNew<Wt::WText>("Email");
-    table->elementAt(0, 1)->addNew<Wt::WText>("Name");
+    wOut_->setText("Hello -- Voter list is already approved");
 
-    table->elementAt(1, 0)->addNew<Wt::WText>("some@email.com");
-    table->elementAt(1, 1)->addNew<Wt::WText>("Some Name");
-
-    table->elementAt(2, 0)->addNew<Wt::WText>("another@email.com");
-    table->elementAt(2, 1)->addNew<Wt::WText>("Another Name");
+    // Verify
+    assert(wTable_   != nullptr);
+    assert(wApprove_ != nullptr);
 }
 
 void VoterList::setup(
@@ -43,11 +40,47 @@ void VoterList::setup(
         {
             wApprove_->disable();
             notify(COMPLETED, id_);
+            wOut_->setText("Voter list is already approved");
         }
         else
         {
             wApprove_->enable();
             notify(INCOMPLETE, step_);
+            wOut_->setText("Voter list is pending approval");
+        }
+
+        // Clean up the table.
+        wTable_->clear();
+        wTable_->elementAt(0, 0)->addNew<Wt::WText>("Name");
+        wTable_->elementAt(0, 1)->addNew<Wt::WText>("Email");
+
+        Wt::WString sentence=
+            "SELECT name, email "
+            "FROM people "
+            "WHERE idx_general={1} "
+            "ORDER BY name ASC";
+
+        sentence.arg(idxVoting_);
+
+        pqxx::result answer;
+        auto status= db_.execSql(sentence.toUTF8(), answer);
+        if(status == NO_ERROR)
+        {
+            int i= 1;
+            for(auto const &row: answer)
+            {
+                std::string name=  row[0].as<std::string>();
+                std::string email= row[1].as<std::string>();
+
+                wTable_->elementAt(i, 0)->addNew<Wt::WText>(name);
+                wTable_->elementAt(i, 1)->addNew<Wt::WText>(email);
+
+                i++;
+            }
+        }
+        else
+        {
+            wOut_->setText(status);
         }
     }
 }

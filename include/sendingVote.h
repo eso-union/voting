@@ -37,5 +37,5 @@ class SendingVote: public Panel
 
         void process();
 
-        std::string toString(bool value);
+        std::string getQuestion();
 };

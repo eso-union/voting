@@ -27,9 +27,11 @@ class Access: public Panel
     private:
 
         std::string lookup_;
-        Wt::WPushButton *bGo= nullptr;
-        Wt::WText *tResult= nullptr;
-        Wt::WLineEdit *iPassword= nullptr;
+
+        Wt::WPushButton *wGo_    = nullptr;
+        Wt::WLineEdit   *wUser_  = nullptr;
+        Wt::WLineEdit   *wPassw_ = nullptr;
 
         void verify();
+        bool verifyUserPassw();
 };

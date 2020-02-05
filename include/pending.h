@@ -19,9 +19,11 @@ class Pending: public Panel
 
     private:
 
-        Wt::WTextArea *wOutput_;
+        Wt::WTextArea *wOutput_ = nullptr;
 
         void pending();
 
         void showPending();
+
+        void resend();
 };

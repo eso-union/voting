@@ -16,7 +16,7 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
 
     // addWidget(std::make_unique<Wt::WText>("<h3>Select or Create Voting</h3>"));
 
-    auto rowA = addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto rowA = wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
     rowA->addStyleClass("row");
 
     auto cellA0 = rowA->addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -47,8 +47,6 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
     sb1->setModel(model);
     sb1->setMargin(10, Wt::Side::Right);
 
-    Wt::WText *out= addNew<Wt::WText>("");
-
     sb1->activated().connect(
         [=]
         {
@@ -62,9 +60,9 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
                     Wt::ItemDataRole::User));
 
             // out->setText(Wt::WString("You selected {1}.").arg(sb1->currentText()));
-            out->setText(
+            wOut_->setText(
                 Wt::WString(
-                    "You selected {1} with index {2}.").arg(text).arg(idxVoting_));
+                    "You selected '{1}' with index {2}.").arg(text).arg(idxVoting_));
         });
 
     wUseSel_= cellA0->addWidget(
@@ -83,7 +81,7 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
             }
         });
 
-    auto rowB= addWidget(std::make_unique<Wt::WContainerWidget>());
+    auto rowB= wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
     rowB->addStyleClass("row");
 
     auto cellB0= rowB->addWidget(std::make_unique<Wt::WContainerWidget>());

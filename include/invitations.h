@@ -19,6 +19,7 @@ class Invitations: public Panel
             const int &value);
 
         void send();
+        void send_x();
 
         /*
         virtual void setup(
@@ -28,13 +29,17 @@ class Invitations: public Panel
 
     private:
 
-        int votingType_= -1;
-        Wt::WPushButton *wSend_= nullptr;
-        Wt::WTextArea *wOutput_= nullptr;
+        bool testing_= -1;
+        Wt::WPushButton *wSend_  = nullptr;
+        Wt::WTextArea   *wOutput_= nullptr;
 
         std::string getBodyTemplate();
 
+        std::string getEmailSubject();
+
+        /*
         void writeFile(
             const std::string &location,
             const std::string &content);
+        */
 };

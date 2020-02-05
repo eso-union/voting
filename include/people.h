@@ -4,11 +4,6 @@
 #include <vector>
 #include <string>
 
-// Boost
-#include <boost/signals2.hpp>
-#include <boost/random/random_device.hpp>
-#include <boost/random/uniform_int_distribution.hpp>
-
 // Wt
 #include <Wt/WContainerWidget.h>
 #include <Wt/WLineEdit.h>

@@ -40,6 +40,7 @@ add_executable(voting_admin
 add_executable(cast_vote
                src/mainCastVote.cpp
                src/castVote.cpp
+               src/command.cpp
                src/postgresql.cpp
                src/panel.cpp
                src/code.cpp

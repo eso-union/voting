@@ -142,9 +142,11 @@ void Question::setData()
             wHtml_->setChecked(row[2].as(bool()));
         }
         setSaved();
-        return;
     }
-    wOut_->setText(status);
+    else
+    {
+        wOut_->setText(status);
+    }
 }
 
 void Question::keyWentDown(const Wt::WKeyEvent& e)

@@ -3,6 +3,11 @@
 #include <iostream>
 #include <fstream>
 
+// Boost
+#include <boost/signals2.hpp>
+#include <boost/random/random_device.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+
 // Wt
 #include <Wt/WFileUpload.h>
 #include <Wt/WProgressBar.h>

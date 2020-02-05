@@ -2,6 +2,7 @@
 #include <Wt/WMessageBox.h>
 
 // Voting
+#include "command.h"
 #include "sendingVote.h"
 
 SendingVote::SendingVote(
@@ -9,12 +10,12 @@ SendingVote::SendingVote(
     const int &idxVoting)
     : Panel(db, idxVoting)
 {
-    addWidget(
-        std::make_unique<Wt::WText>(
-            "<h3>Enter your vote</h3>"));
+    // Set the quetion or header of the vote on top.
+    std::string question= getQuestion();
+    auto title= Wt::WString("<h3>{1}</h3>").arg(question);
+    addWidget(std::make_unique<Wt::WText>(title));
 
-    // wGroup_= std::make_shared<Wt::WButtonGroup>();
-
+    // Set the alternatives.
     std::string sentence=
         "SELECT idx, value "
         "FROM alternative "
@@ -32,21 +33,8 @@ SendingVote::SendingVote(
         Wt::WCheckBox *cb = addNew<Wt::WCheckBox>(text);
         cb->setInline(false);
         cb->setChecked(false);
-        // altList_.push_back(cb);
         options_[idx]= cb;
     }
-
-    /*
-    auto wCode_= addWidget(std::make_unique<Wt::WLineEdit>());
-    wCode_->keyPressed().connect(
-        [=] (const Wt::WKeyEvent& e)
-        {
-            if(e.key() == Wt::Key::Enter)
-            {
-                std::cout << "right!\n";
-                // verify();
-            }
-        }); */
 
     auto wNext_= addWidget(std::make_unique<Wt::WPushButton>("Cast Vote"));
     wNext_->addStyleClass("btn btn-primary btn-lg btn-block");
@@ -106,16 +94,19 @@ void SendingVote::process()
         options.push_back(value);
     }
 
-    // Wt::log("info") << "options: " << options;
-    // std::cout << "options: " << options << "\n";
-
     auto it= std::find(std::begin(options), std::end(options), total);
     if(it == std::end(options))
     {
+        Wt::WString detail= Command::genDetail(options);
+        Wt::WString message= "<p>You selected {1} alternatives. {2}</p>";
+        message
+            .arg(total)
+            .arg(detail);
+
         // This option is not valid.
         Wt::WMessageBox::show(
             "No valid",
-            "<p>You selected 3 options.</p>",
+            message,
             Wt::StandardButton::Ok);
         return;
     }
@@ -125,7 +116,7 @@ void SendingVote::process()
     // Upon positve reply, save the vote, i.e. the options.
     int idxCode= -1;
     std::string sentence=
-        "INSERT INTO code(idx_general, code) "
+        "INSERT INTO code(idx_general, value) "
         "VALUES(" + std::to_string(idxVoting_) + ", '" + code_ + "') "
         "RETURNING idx";
     pqxx::result answer;
@@ -157,7 +148,7 @@ void SendingVote::process()
         sentence+= std::string("VALUES(");
         sentence+= std::to_string(idxCode) + ", ";
         sentence+= std::to_string(it->first) + ", ";
-        sentence+= toString(it->second->isChecked()) + ")";
+        sentence+= Command::toString(it->second->isChecked()) + ")";
         bundle.push_back(std::move(sentence));
     }
     // SQL sentence to mark the code as used.
@@ -173,11 +164,28 @@ void SendingVote::process()
     notify(READY, EMPTY);
 }
 
-std::string SendingVote::toString(bool value)
+std::string SendingVote::getQuestion()
 {
-    if(value)
+    Wt::WString sentence=
+        "SELECT header "
+        "FROM general "
+        "WHERE idx={1};";
+
+    sentence.arg(idxVoting_);
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
     {
-        return "true";
+        if(answer.begin() != answer.end())
+        {
+            auto row= answer.begin();
+            std::string value= row[0].as<std::string>();
+            return value;
+        }
     }
-    return "false";
+    else
+    {
+        wOut_->setText(status);
+    }
 }

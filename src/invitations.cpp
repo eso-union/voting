@@ -1,3 +1,6 @@
+// C
+#include <cassert>
+
 // C++
 #include <thread>
 #include <chrono>
@@ -7,6 +10,7 @@
 #include <fstream>
 
 // Voting
+#include "command.h"
 #include "invitations.h"
 
 Invitations::Invitations(const Postgresql &db): Panel(db)
@@ -16,15 +20,16 @@ Invitations::Invitations(const Postgresql &db): Panel(db)
     description_= "Sending invitations";
 
     setTitle();
-    // std::string msg= "<h3>Send invitation to voters</h3>";
-    // addWidget(std::make_unique<Wt::WText>(msg));
 
-    wSend_ = addWidget(std::make_unique<Wt::WPushButton>("Send"));
+    wSend_ =
+        wCanvas_->addWidget(
+            std::make_unique<Wt::WPushButton>("Send"));
     wSend_->clicked().connect(this, &Invitations::send);
 
-    wOutput_= addWidget(std::make_unique<Wt::WTextArea>());
-    wOutput_->setColumns(40);
-    wOutput_->setRows(20);
+    wOutput_=
+        wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());
+    wOutput_->setColumns(20);
+    wOutput_->setRows(15);
     wOutput_->setReadOnly(true);
 
     Wt::WFont mono;
@@ -37,6 +42,10 @@ Invitations::Invitations(const Postgresql &db): Panel(db)
 
     Wt::WColor fgColor(245, 245, 245);
     wOutput_->decorationStyle().setForegroundColor(fgColor);
+
+    // Verifying pointers
+    assert(wSend_   != nullptr);
+    assert(wOutput_ != nullptr);
 }
 
 void Invitations::setup(
@@ -53,27 +62,39 @@ void Invitations::setup(
             if(isCompleted())
             {
                 // This step is completed, is not active.
+                // Better: DONE than COMPLETED.
                 wSend_->disable();
                 notify(COMPLETED, id_);
+                wOut_->setText("Invitations already sent");
             }
             else
             {
-                // This step is not completed, is active.
+                // This step is not completed, is pending.
                 wSend_->enable();
                 notify(INCOMPLETE, step_);
+                wOut_->setText("Invitations are pending to sent");
+            }
 
-                // Create new widgets.
-                std::string sentence=
-                    "SELECT type "
-                    "FROM general "
-                    "WHERE idx=" + std::to_string(idxVoting_);
+            Wt::WString sentence=
+                "SELECT testing "
+                "FROM general "
+                "WHERE idx={1}";
 
-                pqxx::result answer;
-                db_.execSql(sentence, answer);
-                auto row= answer.begin();
-                votingType_= row[0].as<int>();
+            sentence.arg(idxVoting_);
 
-                Wt::log("info") << "voting type is: " << votingType_;
+            pqxx::result answer;
+            auto status= db_.execSql(sentence.toUTF8(), answer);
+            if(status == NO_ERROR)
+            {
+                if(answer.begin() != answer.end())
+                {
+                    auto row= answer.begin();
+                    testing_= row[0].as<bool>();
+                }
+            }
+            else
+            {
+                wOut_->setText(status);
             }
         }
     }
@@ -83,14 +104,33 @@ void Invitations::send()
 {
     wSend_->disable();
 
+    Command::sendInvitations(
+        idxVoting_,
+        db_,
+        wOutput_);
+
+    // Upon no error
+    notify(COMPLETED, id_);
+    setCompleted();
+}
+
+void Invitations::send_x()
+{
+    wSend_->disable();
+
     Wt::log("info") << "==================== send";
     std::string output;
 
     const std::string bodyTemplate= getBodyTemplate();
-    // const std::string emailSubject= getEmailSubject();
-    const std::string emailSubject= "Negociacion Colectiva 2019: votacion para aprobar o rechazar oferta";
+    std::string emailSubject= getEmailSubject();
+    // const std::string emailSubject= "Negociacion Colectiva 2019: votacion para aprobar o rechazar oferta";
     const std::string originEmailName= "Votacion Sindicato";
     const std::string originEmailAddress= "votacion@sindicatoparanal.cl";
+
+    if(testing_)
+    {
+        emailSubject= std::string("[testing] ") + emailSubject;
+    }
 
     std::string sentence=
         "SELECT name, email, code "
@@ -120,7 +160,7 @@ void Invitations::send()
         std::string content= bodyTemplate;
         boost::replace_first(content, "CODE", code);
         boost::replace_first(content, "NAME", nameDestination);
-        writeFile("/tmp/voting/msg_body.html", content);
+        Command::writeFile("/tmp/voting/msg_body.html", content);
         Wt::log("info") << "just write file";
 
         // Generate command
@@ -175,6 +215,33 @@ void Invitations::setup(
 
 std::string Invitations::getBodyTemplate()
 {
+    std::string result;
+
+    Wt::WString sentence=
+        "SELECT convocatory "
+        "FROM general "
+        "WHERE idx={1}";
+
+    sentence.arg(idxVoting_);
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        if(answer.begin() != answer.end())
+        {
+            auto row= answer.begin();
+            result= row[0].as<std::string>();
+        }
+    }
+    else
+    {
+        wOut_->setText(status);
+    }
+    return result;
+
+
+    /*
     std::string sentence=
         "SELECT convocatory "
         "FROM general "
@@ -185,8 +252,47 @@ std::string Invitations::getBodyTemplate()
     auto row= answer.begin();
     const std::string result= row[0].as<std::string>();
     return result;
+    */
 }
 
+std::string Invitations::getEmailSubject()
+{
+    std::string result;
+
+    // Replace 'name' with 'subject'. <------------- !!
+    Wt::WString sentence=
+        "SELECT name "
+        "FROM general "
+        "WHERE idx={1};";
+
+    sentence.arg(idxVoting_);
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        if(answer.begin() != answer.end())
+        {
+            auto row= answer.begin();
+            result= row[0].as<std::string>();
+        }
+    }
+    else
+    {
+        wOut_->setText(status);
+    }
+    return result;
+
+    /*
+    pqxx::result answer;
+    db_.execSql(sentence, answer);
+    auto row= answer.begin();
+    const std::string result= row[0].as<std::string>();
+    return result;
+    */
+}
+
+/*
 void Invitations::writeFile(
     const std::string &location,
     const std::string &content)
@@ -196,3 +302,4 @@ void Invitations::writeFile(
     file << content;
     file.close();
 }
+*/

@@ -2,6 +2,7 @@
 
 // Wt
 #include <Wt/WPushButton.h>
+#include <Wt/WTable.h>
 
 // Voting
 #include "common.h"
@@ -19,6 +20,7 @@ class VoterList: public Panel
 
     private:
 
+        Wt::WTable      *wTable_  = nullptr;
         Wt::WPushButton *wApprove_= nullptr;
 
         void approve();

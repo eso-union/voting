@@ -45,7 +45,7 @@ void Closing::setup(
 
 void Closing::terminate()
 {
-    wTerminate_->disable();
+    // wTerminate_->disable();
     generateResult();
     notify(COMPLETED, id_);
 }
@@ -56,7 +56,7 @@ void Closing::generateResult()
     std::map<int, std::string> alt;
 
     Wt::WString selAlternat=
-        "SELECT idx, value "
+        "SELECT idx, tag "
         "FROM alternative "
         "WHERE idx_general={1} "
         "ORDER BY idx ASC";
@@ -77,7 +77,7 @@ void Closing::generateResult()
 
     const std::string RETURN= ""; //"\n";
 
-    std::string sentence= "SELECT code.code, ";
+    std::string sentence= "SELECT code.value, ";
 
     // SELECT
     int index= 0;
@@ -139,7 +139,7 @@ void Closing::generateResult()
     }
 
     // ORDER
-    sentence+= "ORDER BY code.code ASC;";
+    sentence+= "ORDER BY code.value ASC;";
     sentence+= RETURN;
 
     // *********************************************
@@ -154,7 +154,7 @@ void Closing::generateResult()
     result= Command::execute(command);
     wOutput_->setText(wOutput_->text() + RET + result + RET);
 
-    command= "psql -d voting00 -c \"" + sentence + "\"";
+    command= "psql -d voting01 -c \"" + sentence + "\"";
     wOutput_->setText(wOutput_->text() + RET + command + RET);
 
     result= Command::execute(command);

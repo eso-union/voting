@@ -214,8 +214,8 @@ bool Alternative::getAlternatives()
     {
         for(auto row: answer)
         {
-            std::string desc= row[0].as(std::string());
-            std::string tag=  row[1].as(std::string());
+            std::string desc= row[0].as<std::string>();
+            std::string tag=  row[1].as<std::string>();
             add(desc, tag);
         }
         setSaved();

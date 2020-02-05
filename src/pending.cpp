@@ -1,24 +1,31 @@
+// C++
+#include <cassert>
+
 // Wt
 #include <Wt/WColor.h>
 #include <Wt/WFont.h>
 #include <Wt/WPushButton.h>
 
 // Voting
+#include "command.h"
 #include "pending.h"
 
 Pending::Pending(const Postgresql &db): Panel(db)
 {
     settingType_= TYPE_ADMIN;
     step_= STEP_4;
-    description_= "Who is pending";
+    description_= "Who is pending and resend of invitations";
 
     // addWidget(std::make_unique<Wt::WText>("<h3>Pending People to Vote</h3>"));
     setTitle();
 
-    auto wPending= addWidget(std::make_unique<Wt::WPushButton>("Result"));
+    auto wPending= wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Result"));
     wPending->clicked().connect(this, &Pending::pending);
 
-    wOutput_= addWidget(std::make_unique<Wt::WTextArea>());
+    auto wResend= wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Resend"));
+    wResend->clicked().connect(this, &Pending::resend);
+
+    wOutput_= wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());
     wOutput_->setColumns(40);
     wOutput_->setRows(20);
     wOutput_->setReadOnly(true);
@@ -33,6 +40,9 @@ Pending::Pending(const Postgresql &db): Panel(db)
 
     Wt::WColor fgColor(245, 245, 245);
     wOutput_->decorationStyle().setForegroundColor(fgColor);
+
+    // Verifying pointers
+    assert(wOutput_ != nullptr);
 }
 
 void Pending::setup(
@@ -49,6 +59,14 @@ void Pending::pending()
 {
     showPending();
     notify(COMPLETED, id_);
+}
+
+void Pending::resend()
+{
+    Command::sendInvitations(
+        idxVoting_,
+        db_,
+        wOutput_);
 }
 
 void Pending::showPending()

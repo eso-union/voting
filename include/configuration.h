@@ -5,6 +5,7 @@
 #include <Wt/WPushButton.h>
 #include <Wt/WRadioButton.h>
 #include <Wt/WStackedWidget.h>
+#include <Wt/WText.h>
 
 // Voting
 #include "common.h"
@@ -20,12 +21,13 @@ class Configuration: public Panel
     private:
 
         std::vector<StepInfo*> statusDisplay_;
-        Wt::WStackedWidget *wStack_= nullptr;
-        Wt::WPushButton *bPrev = nullptr;
-        Wt::WPushButton *bSave = nullptr;
-        Wt::WPushButton *bDiscard = nullptr;
-        Wt::WPushButton *bNext = nullptr;
-        Wt::WPushButton *bLogout = nullptr;
+        Wt::WText          *wTitle_  = nullptr;
+        Wt::WPushButton    *bPrev    = nullptr;
+        Wt::WPushButton    *bSave    = nullptr;
+        Wt::WPushButton    *bDiscard = nullptr;
+        Wt::WPushButton    *bNext    = nullptr;
+        Wt::WPushButton    *bLogout  = nullptr;
+        Wt::WStackedWidget *wStack_  = nullptr;
 
         // Propagate the notification to all panels in the stack.
         // void useSelected(int value);
@@ -53,4 +55,6 @@ class Configuration: public Panel
 
         void addInfoBoxes(
             Wt::WContainerWidget *place);
+
+        void setTitle(const int &idx);
 };
