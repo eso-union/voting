@@ -107,24 +107,7 @@ Administration::Administration(const Postgresql &db): Panel(db)
 
     widgetSettings();
 
-    // There is no need to ask for this information
-    // to the widget, this could be queried from the DB.
-    // Anyway, this is possible only after all the widgets
-    // in the stack has been created.
-    // This is relevant to set the button NEXT.
-    Wt::WWidget *p= wStack_->widget(0);
-    int idx= dynamic_cast<Panel*>(p)->getActive();
-    if(idx == -1)
-    {
-        // Is not possible to go forward without
-        // an active voting.
-        wNext_->disable();
-    }
-    else
-    {
-        react(SELECTED, idx);
-        wNext_->enable();
-    }
+    Wt::log("info") << "**************** Selected: " << idxVoting_;
 }
 
 // Propagate the notification to all panels in the stack.
@@ -174,27 +157,43 @@ void Administration::next()
 
 void Administration::widgetSettings()
 {
-    if(wPrev_ && wNext_)
+    int current= wStack_->currentIndex();
+
+    if(current == 0)
     {
-        int current= wStack_->currentIndex();
+        wPrev_->disable();
+    }
 
-        if(current == 0)
-        {
-            wPrev_->disable();
-        }
+    if(current == (wStack_->count()-1))
+    {
+        wNext_->disable();
+    }
 
-        if(current == (wStack_->count()-1))
-        {
-            wNext_->disable();
-        }
+    if(
+        (current != 0) &&
+        (current != (wStack_->count()-1)))
+    {
+        wPrev_->enable();
+        wNext_->enable();
+    }
 
-        if(
-            (current != 0) &&
-            (current != (wStack_->count()-1)))
-        {
-            wPrev_->enable();
-            wNext_->enable();
-        }
+    // There is no need to ask for this information
+    // to the widget, this could be queried from the DB.
+    // Anyway, this is possible only after all the widgets
+    // in the stack has been created.
+    // This is relevant to set the button NEXT.
+    Wt::WWidget *p= wStack_->widget(0);
+    int idx= dynamic_cast<Panel*>(p)->getActive();
+    if(idx == -1)
+    {
+        // Is not possible to go forward without
+        // an active voting.
+        wNext_->disable();
+    }
+    else
+    {
+        react(SELECTED, idx);
+        wNext_->enable();
     }
 }
 
@@ -215,6 +214,10 @@ void Administration::react(
                 Wt::log("info") << "== i: " << i;
                 Wt::WWidget *p= wStack_->widget(i);
                 dynamic_cast<Panel*>(p)->setup(SELECTED, idxVoting_);
+            }
+            if(wStack_->currentIndex())
+            {
+                wNext_->enable();
             }
             break;
         }

@@ -86,7 +86,11 @@ void CastVote::setVoting(int value)
 int CastVote::getActiveVoting()
 {
     Wt::WString sentence=
-        "SELECT idx FROM general WHERE active=true";
+        "SELECT idx "
+        "FROM general "
+        "WHERE phase={1}";
+
+    sentence.arg(PHASE_ACTIVE);
 
     // try-catch
     pqxx::result answer;

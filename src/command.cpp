@@ -95,7 +95,7 @@ void Command::sendInvitations(
 
     const std::string bodyTemplate= getBodyTemplate(idxVoting, db);
     const std::string emailSubject= testing + getEmailSubject(idxVoting, db);
-    const std::string votingLink= getVotingLink(idxVoting, db);
+    const std::string votingLink= getVotingLink();
     const std::string originEmailName= getEmailName(db); // "Voting Call";
     const std::string originEmailAddress= getEmailAddress(db);  // "voting@somedomain.org";
 
@@ -253,34 +253,12 @@ std::string Command::getEmailSubject(
 }
 
 std::string
-    Command::getVotingLink(
-        const int &idxVoting,
-        Postgresql &db)
+    Command::getVotingLink()
 {
-    std::string result;
-
-    Wt::WString sentence=
-        "SELECT link "
-        "FROM general "
-        "WHERE idx={1};";
-
-    sentence.arg(idxVoting);
-
-    pqxx::result answer;
-    auto status= db.execSql(sentence.toUTF8(), answer);
-    if(status == NO_ERROR)
-    {
-        if(answer.begin() != answer.end())
-        {
-            auto row= answer.begin();
-            result= row[0].as<std::string>();
-        }
-    }
-    else
-    {
-        Wt::log("info") << "error: " << status;
-    }
-    return result;
+    boost::property_tree::ptree tree;
+    boost::property_tree::read_json(CONFIG_FILE, tree);
+    std::string link= tree.get<std::string>("cast.link");
+    return link;
 }
 
 void Command::writeFile(

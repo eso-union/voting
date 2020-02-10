@@ -187,10 +187,12 @@ void Closing::setVotingClosed()
 {
     Wt::WString sentence=
         "UPDATE general "
-        "SET closed=true, active=false "
-        "WHERE idx={1}";
+        "SET phase={1} "
+        "WHERE idx={2}";
 
-    sentence.arg(idxVoting_);
+    sentence
+        .arg(PHASE_CLOSED)
+        .arg(idxVoting_);
 
     auto status= db_.execSql(std::move(sentence.toUTF8()));
     if(status != NO_ERROR)

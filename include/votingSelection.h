@@ -7,6 +7,7 @@
 #include <Wt/WRadioButton.h>
 #include <Wt/WSelectionBox.h>
 #include <Wt/WStringListModel.h>
+#include <Wt/WTable.h>
 
 // Voting
 #include "common.h"
@@ -21,10 +22,21 @@ class VotingSelection: public Panel
 
         VotingSelection(const Postgresql &db);
 
+        virtual void updateInterface();
+
     private:
 
+        Wt::WTable      *wTable_   = nullptr;
         Wt::WLineEdit   *wNewName_ = nullptr;
         Wt::WPushButton *wUseSel_  = nullptr;
 
         void create();
+
+        std::string strTesting(const bool &value);
+
+        std::string strPhase(const int &value);
+
+        void showSummary();
+
+        void reopen(const int &index);
 };

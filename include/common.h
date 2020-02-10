@@ -52,3 +52,7 @@ const int STEP_5 = 5;
 const int STEP_6 = 6;
 
 const std::string NO_ERROR = "";
+
+const int PHASE_ACTIVE     =   0;
+const int PHASE_STANDBY    =   1;
+const int PHASE_CLOSED     =   2;

@@ -7,6 +7,7 @@
 
 // Wt
 #include <Wt/WBreak.h>
+#include <Wt/WLabel.h>
 #include <Wt/WText.h>
 #include <Wt/WPushButton.h>
 
@@ -20,6 +21,18 @@ Question::Question(const Postgresql &db): Panel(db)
     description_= "Setting email message";
 
     setTitle();
+
+    auto wLabel= wCanvas_->addWidget(std::make_unique<Wt::WLabel>("Subject"));
+
+    wSubject_= wCanvas_->addWidget(std::make_unique<Wt::WLineEdit>());
+    wSubject_->setInline(false);
+    wSubject_->keyWentDown().connect(this, &Question::keyWentDown);
+    wLabel->setBuddy(wSubject_);
+
+    wConvocat_= wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());
+    wConvocat_->setColumns(40);
+    wConvocat_->setRows(20);
+    wConvocat_->keyWentDown().connect(this, &Question::keyWentDown);
 
     auto wGetHtml= wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Replace with HTML Template"));
     wGetHtml->addStyleClass("btn btn-success");
@@ -43,15 +56,6 @@ Question::Question(const Postgresql &db): Panel(db)
             wOut_->setText("Modified");
         });
 
-    wConvocat_= wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());
-    wConvocat_->setColumns(40);
-    wConvocat_->setRows(20);
-    wConvocat_->keyWentDown().connect(this, &Question::keyWentDown);
-
-    wLink_= wCanvas_->addWidget(std::make_unique<Wt::WLineEdit>());
-    wLink_->setInline(false);
-    wLink_->keyWentDown().connect(this, &Question::keyWentDown);
-
     wHtml_= wCanvas_->addWidget(std::make_unique<Wt::WCheckBox>("HTML format"));
     wHtml_->setChecked(true);
     wHtml_->setInline(false);
@@ -65,7 +69,7 @@ Question::Question(const Postgresql &db): Panel(db)
     // Verifying pointers
     assert(wConvocat_ != nullptr);
     assert(wHtml_     != nullptr);
-    assert(wLink_     != nullptr);
+    assert(wSubject_  != nullptr);
 }
 
 void Question::save()
@@ -78,12 +82,12 @@ void Question::save()
 
     Wt::WString sentence=
         "UPDATE general "
-        "SET convocatory='{1}', link='{2}', html={3} "
+        "SET convocatory='{1}', subject='{2}', html={3} "
         "WHERE idx={4}";
 
     sentence
         .arg(wConvocat_->text().toUTF8())
-        .arg(wLink_->text().toUTF8())
+        .arg(wSubject_->text().toUTF8())
         .arg(html)
         .arg(idxVoting_);
 
@@ -124,7 +128,7 @@ void Question::setup(
 void Question::setData()
 {
     Wt::WString sentence=
-        "SELECT convocatory, link, html "
+        "SELECT convocatory, subject, html "
         "FROM general "
         "WHERE idx={1}";
 
@@ -138,7 +142,7 @@ void Question::setData()
         {
             auto row= answer.begin();
             wConvocat_->setText(row[0].as(std::string()));
-            wLink_->setText(row[1].as(std::string()));
+            wSubject_->setText(row[1].as(std::string()));
             wHtml_->setChecked(row[2].as(bool()));
         }
         setSaved();

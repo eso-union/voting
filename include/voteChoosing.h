@@ -29,7 +29,7 @@ class VoteChoosing: public Panel
 
         std::string strTesting(const bool &value);
 
-        std::string strActive(const bool &value);
+        std::string strPhase(const int &value);
 
         // std::string strClosed(const bool &value);
 

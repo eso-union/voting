@@ -45,9 +45,7 @@ class Command
                 Postgresql &db);
 
         static std::string
-            getVotingLink(
-                const int &idxVoting,
-                Postgresql &db);
+            getVotingLink();
 
         static std::string
             rndSeq(const unsigned int &len);

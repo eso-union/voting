@@ -12,10 +12,18 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
 
     setTitle();
 
-    addStyleClass("container");
+    // addStyleClass("container");
+
+    wTable_= wCanvas_->addWidget(std::make_unique<Wt::WTable>());
+    wTable_->setWidth(Wt::WLength("100%"));
+    wTable_->addStyleClass("table table-striped");
+
+    updateInterface();
+
 
     // addWidget(std::make_unique<Wt::WText>("<h3>Select or Create Voting</h3>"));
 
+/*
     auto rowA = wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
     rowA->addStyleClass("row");
 
@@ -80,42 +88,51 @@ VotingSelection::VotingSelection(const Postgresql &db): Panel(db)
                 notify(NEXT, EMPTY);
             }
         });
+    */
 
     auto rowB= wCanvas_->addWidget(std::make_unique<Wt::WContainerWidget>());
     rowB->addStyleClass("row");
 
     auto cellB0= rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
     cellB0->addStyleClass("col-md-4");
-
     wNewName_= cellB0->addWidget(std::make_unique<Wt::WLineEdit>());
 
-    auto createVoting = cellB0->addWidget(std::make_unique<Wt::WPushButton>("Create Voting"));
+    auto cellB1= rowB->addWidget(std::make_unique<Wt::WContainerWidget>());
+    cellB1->addStyleClass("col-md-4");
+    auto createVoting= cellB1->addWidget(std::make_unique<Wt::WPushButton>("Create Voting"));
     createVoting->addStyleClass("btn btn-primary");
     createVoting->clicked().connect(this, &VotingSelection::create);
 
     // Verify pointers
-    assert(wNewName_ != nullptr);
-    assert(wUseSel_  != nullptr);
+    // assert(wNewName_ != nullptr);
+    // assert(wUseSel_  != nullptr);
 }
 
 void VotingSelection::create()
 {
-    std::string convocatory= "some text"; // getConvTempalte();
-    std::string header= "some text"; // getHeadTemplate();
     std::string name= wNewName_->text().toUTF8();
-    std::string link= "(empty)";
+    if(name.length() < 5)
+    {
+        wOut_->setText("Name must be at least 5 chars long.");
+        return;
+    }
+
+    std::string convocatory= Wt::WString::tr("convocatory-template-html").toUTF8();
+    std::string header= "(empty)";
+    std::string subject= "(empty)";
 
     Wt::WString sentence=
-        "INSERT INTO general(name, convocatory, header, link, "
-        "with_ministers, qty_ministers, html, testing, closed, active) "
-        "VALUES('{1}', '{2}', '{3}', '{4}', false, 1, true, true, false, false) "
+        "INSERT INTO general(name, convocatory, header, subject, "
+        "with_ministers, qty_ministers, html, testing, phase) "
+        "VALUES('{1}', '{2}', '{3}', '{4}', false, 1, true, true, {5}) "
         "RETURNING idx";
 
     sentence
         .arg(name)
         .arg(convocatory)
         .arg(header)
-        .arg(link);
+        .arg(subject)
+        .arg(PHASE_STANDBY);
 
     try
     {
@@ -129,11 +146,152 @@ void VotingSelection::create()
 
         notify(SELECTED, idxVoting_);
         notify(COMPLETED, id_);
-        notify(NEXT, EMPTY);
+        // notify(NEXT, EMPTY);
+
+        wNewName_->setText("");
     }
     catch(const std::exception &e)
     {
         Wt::log("error") << e.what();
         Wt::log("error") << sentence;
+    }
+    updateInterface();
+}
+
+void VotingSelection::updateInterface()
+{
+    showSummary();
+    // showHelp();
+}
+
+void VotingSelection::showSummary()
+{
+    wTable_->clear();
+
+    Wt::WString sentence=
+        "SELECT idx, name, testing, phase "
+        "FROM general "
+        "ORDER BY phase ASC";
+
+    pqxx::result answer;
+    auto status= db_.execSql(sentence.toUTF8(), answer);
+    if(status == NO_ERROR)
+    {
+        int i= 0;
+        for(auto row: answer)
+        {
+            int idx= row[0].as<int>();
+            wTable_->elementAt(i, 0)->addNew<Wt::WText>(std::to_string(idx));
+            wTable_->elementAt(i, 1)->addNew<Wt::WText>(row[1].as<std::string>());
+
+            bool testing= row[2].as<bool>();
+            int phase= row[3].as<int>();
+
+            if(testing && (phase == PHASE_CLOSED))
+            {
+                wTable_->elementAt(i, 2)->addNew<Wt::WText>(strTesting(testing));
+                wTable_->elementAt(i, 3)->addNew<Wt::WText>("closed");
+                auto wConfig=
+                    wTable_->elementAt(i, 4)->addNew<Wt::WPushButton>("Config");
+                wConfig->clicked().connect(
+                    [=]()
+                    {
+                        const int index= idx;
+                        reopen(index);
+                        updateInterface();
+                    });
+            }
+            else if(phase == PHASE_STANDBY)
+            {
+                wTable_->elementAt(i, 2)->addNew<Wt::WText>(strTesting(testing));
+                wTable_->elementAt(i, 3)->addNew<Wt::WText>(strPhase(phase));
+
+                if(idx != idxVoting_)
+                {
+                    auto wSelect=
+                        wTable_->elementAt(i, 4)->addNew<Wt::WPushButton>("Select");
+                    wSelect->clicked().connect(
+                        [=]()
+                        {
+                            const int index= idx;
+                            // activateVoting(index);
+                            notify(SELECTED, index);
+                            notify(COMPLETED, id_);
+                            updateInterface();
+                        });
+                }
+                else
+                {
+                    wTable_->elementAt(i, 4)->addNew<Wt::WText>("Configuring");
+                }
+            }
+            else if(phase == PHASE_ACTIVE)
+            {
+                wTable_->elementAt(i, 2)->addNew<Wt::WText>(strTesting(testing));
+                wTable_->elementAt(i, 3)->addNew<Wt::WText>(strPhase(phase));
+                wTable_->elementAt(i, 4)->addNew<Wt::WText>("Can't modify");
+            }
+
+            i++;
+        }
+    }
+    else
+    {
+        wOut_->setText(status);
+    }
+}
+
+std::string
+    VotingSelection::strTesting(const bool &value)
+{
+    if(value)
+    {
+        return "testing";
+    }
+    return "real";
+}
+
+std::string
+    VotingSelection::strPhase(const int &value)
+{
+    if(value == PHASE_STANDBY)
+    {
+        return "standby";
+    }
+    else if(value == PHASE_ACTIVE)
+    {
+        return "active";
+    }
+    return "closed";
+}
+
+void VotingSelection::reopen(const int &index)
+{
+    Wt::WString delPeople=
+        "DELETE FROM people "
+        "WHERE idx_general={1}";
+    delPeople.arg(index);
+
+    Wt::WString delCode=
+        "DELETE FROM code "
+        "WHERE idx_general={1}";
+    delCode.arg(index);
+
+    Wt::WString updGen=
+        "UPDATE general "
+        "SET phase={1} "
+        "WHERE idx={2}";
+    updGen
+        .arg(PHASE_STANDBY)
+        .arg(index);
+
+    std::vector<std::string> bundle;
+    bundle.push_back(delPeople.toUTF8());
+    bundle.push_back(delCode.toUTF8());
+    bundle.push_back(updGen.toUTF8());
+    auto status= db_.execSql(bundle);
+    if(status != NO_ERROR)
+    {
+        wOut_->setText(status);
     }
 }

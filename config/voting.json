@@ -1,0 +1,18 @@
+{
+    "db":
+    {
+        "host": "",
+        "name": "somedb",
+        "user": "",
+        "passw": ""
+    },
+    "email":
+    {
+        "name": "Voting Call",
+        "address": "voting@somedomain.org"
+    },
+    "cast":
+    {
+        "link": "https://somedomain.org/cast_vote"
+    }
+}

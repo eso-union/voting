@@ -22,15 +22,10 @@ VoteChoosing::VoteChoosing(
     setTitle();
 
     idxVoting_= getActiveVoting();
-
-    std::cout << "-------------- 0 --------------" << std::endl;
-
     if(idxVoting_ != -1)
     {
         stageAct_= getActiveStage();
     }
-
-    std::cout << "-------------- 1 --------------" << std::endl;
 
     /*
     auto rowA= addWidget(std::make_unique<Wt::WContainerWidget>());
@@ -47,12 +42,6 @@ VoteChoosing::VoteChoosing(
     wTable_->addStyleClass("table table-striped");
 
     updateInterface();
-
-    focussed().connect(
-        [=]()
-        {
-            Wt::log("info") << "------------------ got focus!";
-        });
 
     // ------------------------------
 
@@ -159,13 +148,17 @@ std::string
 }
 
 std::string
-    VoteChoosing::strActive(const bool &value)
+    VoteChoosing::strPhase(const int &value)
 {
-    if(value)
+    if(value == PHASE_STANDBY)
+    {
+        return "standby";
+    }
+    else if(value == PHASE_ACTIVE)
     {
         return "active";
     }
-    return "standby";
+    return "closed";
 }
 
 /*
@@ -185,9 +178,9 @@ void VoteChoosing::showSummary()
     wTable_->clear();
 
     Wt::WString sentence=
-        "SELECT idx, name, testing, active, closed "
+        "SELECT idx, name, testing, phase "
         "FROM general "
-        "ORDER BY active DESC, closed ASC";
+        "ORDER BY phase ASC";
 
     pqxx::result answer;
     auto status= db_.execSql(sentence.toUTF8(), answer);
@@ -201,16 +194,14 @@ void VoteChoosing::showSummary()
             wTable_->elementAt(i, 1)->addNew<Wt::WText>(row[1].as<std::string>());
 
             bool testing= row[2].as<bool>();
-            bool active= row[3].as<bool>();
-            bool closed= row[4].as<bool>();
+            int phase= row[3].as<int>();
 
-            if(closed)
+            if(phase == PHASE_CLOSED)
             {
                 wTable_->elementAt(i, 2)->addNew<Wt::WText>(strTesting(testing));
-                wTable_->elementAt(i, 3)->addNew<Wt::WText>(" -- ");
-                wTable_->elementAt(i, 4)->addNew<Wt::WText>("closed");
+                wTable_->elementAt(i, 3)->addNew<Wt::WText>("closed");
                 auto wReview=
-                    wTable_->elementAt(i, 5)->addNew<Wt::WPushButton>("Review");
+                    wTable_->elementAt(i, 4)->addNew<Wt::WPushButton>("Review");
                 wReview->clicked().connect(
                     [=]()
                     {
@@ -221,12 +212,11 @@ void VoteChoosing::showSummary()
             else
             {
                 wTable_->elementAt(i, 2)->addNew<Wt::WText>(strTesting(testing));
-                wTable_->elementAt(i, 3)->addNew<Wt::WText>(strActive(active));
-                wTable_->elementAt(i, 4)->addNew<Wt::WText>();
+                wTable_->elementAt(i, 3)->addNew<Wt::WText>(strPhase(phase));
                 if(idx != idxVoting_)
                 {
                     auto wActivate=
-                        wTable_->elementAt(i, 5)->addNew<Wt::WPushButton>("Activate");
+                        wTable_->elementAt(i, 4)->addNew<Wt::WPushButton>("Activate");
                     wActivate->clicked().connect(
                         [=]()
                         {
@@ -256,7 +246,9 @@ int VoteChoosing::getActiveVoting()
     Wt::WString sentence=
         "SELECT idx "
         "FROM general "
-        "WHERE active=true";
+        "WHERE phase={1}";
+
+    sentence.arg(PHASE_ACTIVE);
 
     pqxx::result answer;
     auto status= db_.execSql(sentence.toUTF8(), answer);
@@ -285,17 +277,25 @@ void VoteChoosing::activateVoting(const int &index)
     // Deactivate every other one.
     Wt::WString sentence=
         "UPDATE general "
-        "SET active=false "
-        "WHERE idx!={1}";
-    sentence.arg(index);
+        "SET phase={1} "
+        "WHERE phase={2}";
+
+    sentence
+        .arg(PHASE_STANDBY)
+        .arg(PHASE_ACTIVE);
+
     bundle.push_back(sentence.toUTF8());
 
     // Activate the selected one.
     sentence=
         "UPDATE general "
-        "SET active=true "
-        "WHERE idx={1}";
-    sentence.arg(index);
+        "SET phase={1} "
+        "WHERE idx={2}";
+
+    sentence
+        .arg(PHASE_ACTIVE)
+        .arg(index);
+
     bundle.push_back(sentence.toUTF8());
 
     auto status= db_.execSql(bundle);
