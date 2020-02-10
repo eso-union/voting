@@ -1,15 +1,17 @@
-#ifndef POSTGRESQL_H
-#define POSTGRESQL_H
+#pragma once
 
-/// C++
+// C++
 #include <string>
 #include <vector>
 
-/// Boost
+// Boost
 #include <boost/scoped_ptr.hpp>
 
-/// Postgresql
+// Postgresql
 #include <pqxx/pqxx>
+
+// Voting
+#include "common.h"
 
 /**
  *
@@ -18,7 +20,8 @@ class Postgresql
 {
     public:
 
-        Postgresql(const std::string &name);
+        // Postgresql(const std::string &name);
+        Postgresql(const dbConfig &par);
 
         Postgresql(const Postgresql &db);
 
@@ -50,6 +53,7 @@ class Postgresql
         pqxx::result query(
             const std::string &sentence);
 
+/*
         static void extract(
             const pqxx::result &answer,
             int &value);
@@ -57,11 +61,40 @@ class Postgresql
         static void extract(
             const pqxx::result &answer,
             bool &value);
+*/
+
+        template<typename V>
+        V extract(const std::string &sentence)
+        {
+            V value;
+            try
+            {
+                pqxx::work T(*dbConnection, "extract");
+                pqxx::result answer= T.exec(sentence);
+                if(answer.begin() != answer.end())
+                {
+                    auto row= answer.begin();
+                    value= row[0].as<V>();
+                }
+                //T.commit();
+            }
+            catch(const pqxx::sql_error &e)
+            {
+                Wt::log("error") << "exception: " << e.what();
+            }
+            catch(const std::exception &e)
+            {
+                Wt::log("error") << "exception: " << e.what();
+            }
+            catch(...)
+            {
+                Wt::log("error") << "unhandled exception\n";
+            }
+            return value;
+        }
 
     private:
 
         // pqxx::connection *dbConnection;
         std::shared_ptr<pqxx::connection> dbConnection;
 };
-
-#endif /// POSTGRESQL_H

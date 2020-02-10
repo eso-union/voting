@@ -85,8 +85,6 @@ void SendingVote::process()
 
     selOption.arg(idxVoting_);
 
-    Wt::log("info") << "selOption: " << selOption;
-
     pqxx::result ansOption= db_.query(selOption.toUTF8());
     for(auto row: ansOption)
     {

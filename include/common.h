@@ -1,7 +1,29 @@
 #pragma once
 
+// Boost
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/foreach.hpp>
+
+// Voting
 #include <string>
 #include <vector>
+
+struct dbConfig
+{
+    std::string host;
+    std::string dbname;
+    std::string user;
+    std::string passw;
+};
+
+struct emailConfig
+{
+    std::string name;
+    std::string address;
+};
+
+const std::string CONFIG_FILE= "/usr/local/etc/voting.json";
 
 const int EMPTY        =  -1;
 const int READY        =   0;

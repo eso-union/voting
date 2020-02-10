@@ -2,38 +2,57 @@
 #include <cassert>
 #include <iostream>
 
-//
-// #include "common.h"
-// #include "exception.h"
+// Wt
+#include <Wt/WLogger.h>
+
+// Voting
 #include "postgresql.h"
 
-Postgresql::Postgresql(const std::string &name)
+// Postgresql::Postgresql(const std::string &name)
+Postgresql::Postgresql(const dbConfig &par)
 {
-    std::string connParameters;
+    // The database connection parameters
+    // are set in a string.
+    std::string connParam;
 
-    if(name != "")
+    if(par.host != "")
     {
-        connParameters+= "dbname=" + name + " ";
+        connParam+= "host=" + par.host + " ";
+    }
+
+    if(par.dbname != "")
+    {
+        connParam+= "dbname=" + par.dbname + " ";
+    }
+
+    if(par.user != "")
+    {
+        connParam+= "user=" + par.user + " ";
+    }
+
+    if(par.passw != "")
+    {
+        connParam+= "password=" + par.passw + " ";
     }
 
     try
     {
-        // dbConnection= new pqxx::connection(connParameters);
-        dbConnection= std::make_shared<pqxx::connection>(connParameters);
-        std::cout << "connected to database \n";
-        std::cout << "backend version: " << dbConnection->server_version() << "\n";
-        std::cout << "protocol version: " << dbConnection->protocol_version() << std::endl;
+        // dbConnection= new pqxx::connection(connParam);
+        dbConnection= std::make_shared<pqxx::connection>(connParam);
+        Wt::log("info") << "connected to database";
+        Wt::log("info") << "backend version: " << dbConnection->server_version();
+        Wt::log("info") << "protocol version: " << dbConnection->protocol_version();
 
     }
     catch(const std::exception &e)
     {
-        std::cerr << "exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
     }
 }
 
 Postgresql::Postgresql(const Postgresql &db)
 {
-    dbConnection = db.dbConnection;
+    dbConnection= db.dbConnection;
 }
 
 Postgresql& Postgresql::operator=(const Postgresql &db)
@@ -42,7 +61,7 @@ Postgresql& Postgresql::operator=(const Postgresql &db)
     {
         return *this;
     }
-    dbConnection = db.dbConnection;
+    dbConnection= db.dbConnection;
     return *this;
 }
 
@@ -101,18 +120,18 @@ std::string
     }
     catch(const pqxx::sql_error &e)
     {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
         error= e.what();
     }
     catch(const std::exception &e)
     {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
         error= e.what();
     }
     catch(...)
     {
-        std::cerr << "Unhandled exception\n";
-        error= "Unhandled exception";
+        Wt::log("error") << "unhandled exception";
+        error= "unhandled exception";
     }
     return error;
 }
@@ -144,18 +163,18 @@ std::string
     }
     catch(const pqxx::sql_error &e)
     {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
         error= e.what();
     }
     catch(const std::exception &e)
     {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
         error= e.what();
     }
     catch(...)
     {
-        std::cerr << "Unhandled exception\n";
-        error= "Unhandled exception";
+        Wt::log("error") << "unhandled exception\n";
+        error= "unhandled exception";
     }
     return error;
 }
@@ -172,7 +191,10 @@ std::string
          **/
         pqxx::work T(*dbConnection, "execute_several_no_answer");
 
-        for(std::vector<std::string>::iterator it= bundle.begin(); it!=bundle.end(); ++it)
+        for(
+            auto it= bundle.begin();
+            it != bundle.end();
+            ++it)
         {
             const std::string sentence= *it;
             T.exec(sentence);
@@ -182,18 +204,18 @@ std::string
     }
     catch(const pqxx::sql_error &e)
     {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
         error= e.what();
     }
     catch(const std::exception &e)
     {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
         error= e.what();
     }
     catch(...)
     {
-        std::cerr << "Unhandled exception\n";
-        error= "Unhandled exception";
+        Wt::log("error") << "unhandled exception\n";
+        error= "unhandled exception";
     }
     return error;
 }
@@ -217,28 +239,22 @@ pqxx::result Postgresql::query(
     }
     catch(const pqxx::sql_error &e)
     {
-        throw(e);
+        Wt::log("error") << "exception: " << e.what();
     }
     catch(const std::exception &e)
     {
-        /**
-         * All exceptions thrown by libpqxx are
-         * derived from std::exception.
-         **/
-        std::cerr << "Exception: " << e.what() << std::endl;
+        Wt::log("error") << "exception: " << e.what();
     }
     catch(...)
     {
-        /**
-         * This is unexpected.
-         **/
-        std::cerr << "Unhandled exception\n";
+        Wt::log("error") << "unhandled exception\n";
     }
 
     // Return the answer
     return answer;
 }
 
+/*
 void Postgresql::extract(const pqxx::result &answer, int &value)
 {
     const pqxx::result::const_iterator row = answer.begin();
@@ -258,3 +274,4 @@ void Postgresql::extract(const pqxx::result &answer, bool &value)
         value= row[0].as<bool>();
     }
 }
+*/

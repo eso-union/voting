@@ -24,6 +24,7 @@ Invitations::Invitations(const Postgresql &db): Panel(db)
     wSend_ =
         wCanvas_->addWidget(
             std::make_unique<Wt::WPushButton>("Send"));
+    wSend_->addStyleClass("btn btn-success");
     wSend_->clicked().connect(this, &Invitations::send);
 
     wOutput_=

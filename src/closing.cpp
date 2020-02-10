@@ -7,8 +7,9 @@ Closing::Closing(const Postgresql &db): Panel(db)
     step_= STEP_4;
     description_= "Close voting";
 
-    // addWidget(std::make_unique<Wt::WText>("<h3>Terminate Voting</h3>"));
-    setTitle();
+    Wt::WString title= "<h3>{1}</h3>";
+    title.arg(description_);
+    wTitle_= wCanvas_->addWidget(std::make_unique<Wt::WText>(title));
 
     wTerminate_= addWidget(std::make_unique<Wt::WPushButton>("Result and Terminate"));
     wTerminate_->clicked().connect(this, &Closing::terminate);
@@ -45,9 +46,17 @@ void Closing::setup(
 
 void Closing::terminate()
 {
-    // wTerminate_->disable();
+    wTerminate_->disable();
     generateResult();
     notify(COMPLETED, id_);
+    setVotingClosed();
+}
+
+void Closing::showOnly()
+{
+    wTitle_->setHidden(true);
+    wTerminate_->setHidden(true);
+    generateResult();
 }
 
 void Closing::generateResult()
@@ -144,19 +153,48 @@ void Closing::generateResult()
 
     // *********************************************
 
+    wOutput_->setText("");
+
     const std::string RET= "\n";
-    std::string command;
     std::string result;
 
-    command= "mkdir -p /tmp/voting/";
-    wOutput_->setText(wOutput_->text() + RET + command);
+    /*
+    std::string mkdirCmd= "mkdir -p /tmp/voting/";
+    wOutput_->setText(wOutput_->text() + RET + mkdirCmd);
 
-    result= Command::execute(command);
+    result= Command::execute(mkdirCmd);
     wOutput_->setText(wOutput_->text() + RET + result + RET);
+    */
 
-    command= "psql -d voting01 -c \"" + sentence + "\"";
-    wOutput_->setText(wOutput_->text() + RET + command + RET);
+    // command= "psql -d voting02 -c \"" + sentence + "\"";
+    // std::string machine= "SELECT dbname FROM machine";
+    // std::string dbName= db_.extract<std::string>(machine);
 
-    result= Command::execute(command);
+    dbConfig dbPar= Command::getDbConfig(CONFIG_FILE);
+
+    // This command would have a more complex configuration
+    // if the database is in a different host or conencted
+    // with different user name.
+    Wt::WString psqlCmd= "psql -d {1} -c \"{2}\"";
+    psqlCmd.arg(dbPar.dbname).arg(sentence);
+    wOutput_->setText(wOutput_->text() + RET + sentence + RET);
+
+    result= Command::execute(psqlCmd.toUTF8());
     wOutput_->setText(wOutput_->text() + RET + result + RET);
+}
+
+void Closing::setVotingClosed()
+{
+    Wt::WString sentence=
+        "UPDATE general "
+        "SET closed=true, active=false "
+        "WHERE idx={1}";
+
+    sentence.arg(idxVoting_);
+
+    auto status= db_.execSql(std::move(sentence.toUTF8()));
+    if(status != NO_ERROR)
+    {
+        wOut_->setText(status);
+    }
 }

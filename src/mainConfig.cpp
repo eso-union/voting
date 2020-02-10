@@ -5,9 +5,11 @@
 #include <Wt/WFormWidget.h>
 
 // Voting
+#include "common.h"
+#include "command.h"
+#include "configuration.h"
 #include "postgresql.h"
 #include "switcher.h"
-#include "configuration.h"
 
 class BasicApp: public Wt::WApplication
 {
@@ -81,21 +83,11 @@ class AppGenerator
  **/
 int main(int argc, char **argv)
 {
-    Postgresql db("voting01");
+    dbConfig dbPar= Command::getDbConfig(CONFIG_FILE);
+    Postgresql db(dbPar);
 
-    /*
-    pqxx::result answer;
-    std::string sentence= "SELECT * FROM general;";
-    db.execSql(sentence, answer);
-    const pqxx::result::const_iterator row= answer.begin();
-    if(row != answer.end())
-    {
-        std::cout
-            << "row: "
-            << row[0].as(std::string()) << ", "
-            << row[1].as(std::string()) << "\n";
-    }
-    */
+    emailConfig ePar= Command::getEmailConfig(CONFIG_FILE);
+    Command::setEmailConfig(db, ePar);
 
     AppGenerator ag(db);
 

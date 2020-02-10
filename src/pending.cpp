@@ -16,13 +16,14 @@ Pending::Pending(const Postgresql &db): Panel(db)
     step_= STEP_4;
     description_= "Who is pending and resend of invitations";
 
-    // addWidget(std::make_unique<Wt::WText>("<h3>Pending People to Vote</h3>"));
     setTitle();
 
-    auto wPending= wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Result"));
+    auto wPending= wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Show pending"));
+    wPending->addStyleClass("btn btn-success");
     wPending->clicked().connect(this, &Pending::pending);
 
-    auto wResend= wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Resend"));
+    auto wResend= wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Resend invitation to pending"));
+    wResend->addStyleClass("btn btn-info");
     wResend->clicked().connect(this, &Pending::resend);
 
     wOutput_= wCanvas_->addWidget(std::make_unique<Wt::WTextArea>());

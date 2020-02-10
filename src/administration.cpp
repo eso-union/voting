@@ -106,6 +106,25 @@ Administration::Administration(const Postgresql &db): Panel(db)
         });
 
     widgetSettings();
+
+    // There is no need to ask for this information
+    // to the widget, this could be queried from the DB.
+    // Anyway, this is possible only after all the widgets
+    // in the stack has been created.
+    // This is relevant to set the button NEXT.
+    Wt::WWidget *p= wStack_->widget(0);
+    int idx= dynamic_cast<Panel*>(p)->getActive();
+    if(idx == -1)
+    {
+        // Is not possible to go forward without
+        // an active voting.
+        wNext_->disable();
+    }
+    else
+    {
+        react(SELECTED, idx);
+        wNext_->enable();
+    }
 }
 
 // Propagate the notification to all panels in the stack.
@@ -132,6 +151,9 @@ void Administration::previous()
     {
         current--;
         wStack_->setCurrentIndex(current);
+
+        Wt::WWidget *p= wStack_->widget(current);
+        dynamic_cast<Panel*>(p)->updateInterface();
     }
     widgetSettings();
 }
@@ -143,6 +165,9 @@ void Administration::next()
     {
         current++;
         wStack_->setCurrentIndex(current);
+
+        Wt::WWidget *p= wStack_->widget(current);
+        dynamic_cast<Panel*>(p)->updateInterface();
     }
     widgetSettings();
 }

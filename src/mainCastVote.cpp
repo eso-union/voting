@@ -8,6 +8,8 @@
 #include <Wt/WFormWidget.h>
 
 // Voting
+#include "common.h"
+#include "command.h"
 #include "postgresql.h"
 #include "switcher.h"
 #include "castVote.h"
@@ -78,7 +80,8 @@ class AppGenerator
  **/
 int main(int argc, char **argv)
 {
-    Postgresql db("voting01");
+    dbConfig dbPar= Command::getDbConfig(CONFIG_FILE);
+    Postgresql db(dbPar);
 
     AppGenerator ag(db);
 

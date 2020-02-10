@@ -7,9 +7,10 @@ Minister::Minister(const Postgresql &db): Panel(db)
     step_= STEP_1;
     description_= "Creation of Minister's passwords";
 
-    Wt::WString title= "<h3>{1}</h3>";
-    title.arg(description_);
-    addWidget(std::make_unique<Wt::WText>(title));
+    // Wt::WString title= "<h3>{1}</h3>";
+    // title.arg(description_);
+    // addWidget(std::make_unique<Wt::WText>(title));
+    setTitle();
 
     // How many?
     for(int id= 0; id<qtyMinisters_; id++)

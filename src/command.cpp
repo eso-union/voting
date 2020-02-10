@@ -88,7 +88,7 @@ void Command::sendInvitations(
     Wt::WTextArea *wFeedback)
 {
     std::string testing;
-    if(Command::isTesting(db))
+    if(Command::getTesting(db))
     {
         testing= "[testing] ";
     }
@@ -96,8 +96,8 @@ void Command::sendInvitations(
     const std::string bodyTemplate= getBodyTemplate(idxVoting, db);
     const std::string emailSubject= testing + getEmailSubject(idxVoting, db);
     const std::string votingLink= getVotingLink(idxVoting, db);
-    const std::string originEmailName= "Votacion Sindicato";
-    const std::string originEmailAddress= "votacion@sindicatoparanal.cl";
+    const std::string originEmailName= getEmailName(db); // "Voting Call";
+    const std::string originEmailAddress= getEmailAddress(db);  // "voting@somedomain.org";
 
     Wt::WString sentence=
         "SELECT name, email, code "
@@ -283,11 +283,6 @@ std::string
     return result;
 }
 
-bool Command::isTesting(Postgresql &db)
-{
-    return true;
-}
-
 void Command::writeFile(
     const std::string &location,
     const std::string &content)
@@ -339,4 +334,78 @@ std::string
         msg+= " alternatives.";
     }
     return msg.toUTF8();
+}
+
+dbConfig
+    Command::getDbConfig(
+        const std::string &filename)
+{
+    dbConfig par;
+    boost::property_tree::ptree tree;
+    boost::property_tree::read_json(filename, tree);
+    par.dbname= tree.get<std::string>("db.name");
+    par.host  = tree.get<std::string>("db.host");
+    par.user  = tree.get<std::string>("db.user");
+    par.passw = tree.get<std::string>("db.passw");
+    return par;
+}
+
+emailConfig
+    Command::getEmailConfig(
+        const std::string &filename)
+{
+    emailConfig par;
+    boost::property_tree::ptree tree;
+    boost::property_tree::read_json(filename, tree);
+    par.name    = tree.get<std::string>("email.name");
+    par.address = tree.get<std::string>("email.address");
+    return par;
+}
+
+void Command::setEmailConfig(
+    Postgresql &db,
+    const emailConfig &par)
+{
+    Wt::WString delSentence=
+        "DELETE FROM machine ";
+
+    Wt::WString insSentence=
+        "INSERT INTO machine(email_name, email_address) "
+        "VALUES('{1}', '{2}')";
+
+    insSentence
+        .arg(par.name)
+        .arg(par.address);
+
+    std::vector<std::string> bundle;
+    bundle.push_back(delSentence.toUTF8());
+    bundle.push_back(insSentence.toUTF8());
+    db.execSql(bundle);
+}
+
+bool Command::getTesting(Postgresql &db)
+{
+    std::string sentence=
+        "SELECT testing "
+        "FROM general";
+    bool value= db.extract<bool>(sentence);
+    return value;
+}
+
+std::string Command::getEmailName(Postgresql &db)
+{
+    std::string sentence=
+        "SELECT email_name "
+        "FROM machine";
+    std::string value= db.extract<std::string>(sentence);
+    return value;
+}
+
+std::string Command::getEmailAddress(Postgresql &db)
+{
+    std::string sentence=
+        "SELECT email_address "
+        "FROM machine";
+    std::string value= db.extract<std::string>(sentence);
+    return value;
 }

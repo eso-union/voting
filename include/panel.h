@@ -40,6 +40,10 @@ class Panel: public Wt::WContainerWidget
 
         virtual std::string description();
 
+        virtual int getActive();
+
+        virtual void updateInterface();
+
         boost::signals2::signal<void (int, int)> notify;
 
     protected:
@@ -52,6 +56,7 @@ class Panel: public Wt::WContainerWidget
         std::string description_= "(empty)";
         Wt::WContainerWidget *wCanvas_= nullptr;
         Wt::WText            *wOut_   = nullptr;
+        Wt::WText            *wHelp_  = nullptr;
 
         void setCompleted();
 

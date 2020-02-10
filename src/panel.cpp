@@ -17,6 +17,9 @@ Panel::Panel(
     addWidget(std::make_unique<Wt::WBreak>());
 
     auto wMsg= addWidget(std::make_unique<Wt::WContainerWidget>());
+
+    wHelp_= wMsg->addWidget(std::make_unique<Wt::WText>());
+
     wOut_= wMsg->addWidget(std::make_unique<Wt::WText>());
 
     Wt::WColor bgColor(206, 242, 255);
@@ -27,6 +30,7 @@ Panel::Panel(
 
     // Verify pointers
     assert(wCanvas_ != nullptr);
+    assert(wHelp_   != nullptr);
     assert(wOut_    != nullptr);
 }
 
@@ -124,3 +128,11 @@ bool Panel::isCompleted()
     }
     return true;
 }
+
+int Panel::getActive()
+{
+    return idxVoting_;
+}
+
+void Panel::updateInterface()
+{}

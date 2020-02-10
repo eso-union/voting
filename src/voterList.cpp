@@ -18,7 +18,7 @@ VoterList::VoterList(const Postgresql &db): Panel(db)
     wApprove_ = wCanvas_->addWidget(std::make_unique<Wt::WPushButton>("Approve"));
     wApprove_->clicked().connect(this, &VoterList::approve);
 
-    wTable_= wCanvas_->addWidget(Wt::cpp14::make_unique<Wt::WTable>());
+    wTable_= wCanvas_->addWidget(std::make_unique<Wt::WTable>());
     wTable_->setHeaderCount(1);
     wTable_->setWidth(Wt::WLength("100%"));
 

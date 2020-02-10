@@ -10,6 +10,7 @@
 #include <Wt/WTextArea.h>
 
 // Voting
+#include "common.h"
 #include "postgresql.h"
 
 class Command
@@ -48,9 +49,6 @@ class Command
                 const int &idxVoting,
                 Postgresql &db);
 
-        static bool
-            isTesting(Postgresql &db);
-
         static std::string
             rndSeq(const unsigned int &len);
 
@@ -64,4 +62,21 @@ class Command
 
         static std::string
             genDetail(const std::vector<int> &options);
+
+        static dbConfig
+            getDbConfig(const std::string &filename);
+
+        static emailConfig
+            getEmailConfig(const std::string &filename);
+
+        static void
+            setEmailConfig(
+                Postgresql &db,
+                const emailConfig &par);
+
+        static bool getTesting(Postgresql &db);
+
+        static std::string getEmailName(Postgresql &db);
+
+        static std::string getEmailAddress(Postgresql &db);
 };

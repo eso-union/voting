@@ -12,7 +12,7 @@ PasswCreation::PasswCreation(
 {
     std::string text= "Password for Minister " + std::to_string(ministerId_ + 1);
     addWidget(std::make_unique<Wt::WLabel>(text));
-    wTable_= addWidget(Wt::cpp14::make_unique<Wt::WTable>());
+    wTable_= addWidget(std::make_unique<Wt::WTable>());
     wTable_->setWidth(Wt::WLength("100%"));
     wTable_->addStyleClass("table table-striped");
 

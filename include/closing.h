@@ -18,12 +18,17 @@ class Closing: public Panel
             const int &type,
             const int &value);
 
+        void showOnly();
+
     private:
 
         Wt::WPushButton *wTerminate_;
         Wt::WTextArea *wOutput_;
+        Wt::WText            *wTitle_  = nullptr;
 
         void terminate();
 
         void generateResult();
+
+        void setVotingClosed();
 };
